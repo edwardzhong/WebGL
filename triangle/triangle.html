@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<title>三角形</title>
+</head>
+<body>
+<canvas id="canvas" width="400" height="400"></canvas>
+<script src="../js/webgl.js"></script>
+<script type="x-shader/x-vertex" id="vs">
+	attribute vec4 a_Position; //限定符，类型(4个浮点数的矢量)，变量名称：顶点，attribute变量传输与顶点有关的数据，表示逐顶点的信息(顶点依次传递给它的意思) 
+	// uniform vec4 u_Translation; //位移, uniform变量传输的是所有顶点(或与顶点无关)都相同的数据(各顶点或片元共用的数据，比如矩阵变换), 可以是除了数组和结构体外的任意类型
+	uniform float u_Angle;//角度
+	// attribute float a_PositionSize;
+	void main() { 
+		float deg=radians(u_Angle);//角度转弧度
+		float sinB=sin(deg);
+		float cosB=cos(deg);
+		gl_Position.x = a_Position.x*cosB - a_Position.y*sinB;
+		gl_Position.y = a_Position.x*sinB + a_Position.y*cosB;
+		gl_Position.z = a_Position.z;
+		gl_Position.w = 1.0;
+		// gl_Position = a_Position + u_Translation; 
+		// gl_PointSize = a_PositionSize; 
+	} 
+</script>
+<script type="x-shader/x-fragment" id="fs">
+	precision mediump float; // 精度限定
+	uniform vec4 u_FragColor;  // 限定符，类型，变量名称: uniform变量，不能使用attribute变量
+	void main() {
+		gl_FragColor = u_FragColor;
+	}
+</script>
+<script>
+	var	canvas=document.getElementById('canvas'),
+		gl=get3DContext(canvas,true);
+
+	function main() {
+		if (!gl) {
+			console.log('Failed to get the rendering context for WebGL');
+			return;
+		}
+
+		if (!initShaders(gl, 'fs', 'vs')) {
+			console.log('Failed to intialize shaders.');
+			return;
+		}
+
+		// 创建缓冲区并传人顶点
+		var vertices=new Float32Array([-0.5, 0.5,   -0.5, -0.5,   0.5, 0.5,　0.5, -0.5 ])
+		if(!createBuffer(vertices)){
+		    console.log('Failed to create the buffer object');
+		    return;
+		}
+
+		// 获取顶点位置
+		var a_Position = gl.getAttribLocation(gl.program, 'a_Position');
+		if (a_Position < 0) {
+			console.log('Failed to get the storage location of a_Position');
+			return;
+		}
+
+		// Assign the buffer object to a_Position variable
+		// (地址,每个顶点分量的个数<1-4>,数据类型<整形，符点等>,是否归一化,指定相邻两个顶点间字节数<默认0>,指定缓冲区对象偏移量<默认0>)
+		gl.vertexAttribPointer(a_Position, 2, gl.FLOAT, false, 0, 0);
+
+		// Enable the assignment to a_Position variable
+		gl.enableVertexAttribArray(a_Position);
+
+		// 获取attribute变量的尺寸，并赋值
+		// var a_PositionSize = gl.getAttribLocation(gl.program, 'a_PositionSize');
+		// gl.vertexAttrib1f(a_PositionSize, 10.0);
+
+		// 获取 u_FragColor变量的存储地址并赋值
+		var u_FragColor = gl.getUniformLocation(gl.program, 'u_FragColor');
+		if (!u_FragColor) {
+			console.log('Failed to get the storage location of u_FragColor');
+			return;
+		}
+		gl.uniform4f(u_FragColor, 1.0, 0.0, 0.0, 1.0);
+
+		// 旋转 传递角度
+		var u_Angle = gl.getUniformLocation(gl.program, 'u_Angle');
+		gl.uniform1f(u_Angle, 90.0);
+
+		// //位移
+		// var u_Translation = gl.getUniformLocation(gl.program, 'u_Translation');
+		// if (!u_Translation) {
+		// 	console.log('Failed to get the storage location of u_Translation');
+		// 	return;
+		// }
+		// // (位移变量,tx,ty,tz,w)
+		// gl.uniform4f(u_Translation, 0.3, 0.3, 0.0, 0.0);
+
+		gl.clearColor(0.0, 0.0, 0.0, 1.0);
+		gl.clear(gl.COLOR_BUFFER_BIT);
+
+		// (基本图形，第几个顶点，执行几次)，修改基本图形项可以生成点，线，三角形，矩形，扇形等
+		// POINTS //点
+		// LINES //线段
+		// LINE_STRIP //线条
+		// LINE_LOOP //回路
+		// TRIANGLES //三角形
+		// TRIANGLE_STRIP //三角带
+		// TRIANGLE_FAN //三角扇
+		gl.drawArrays(gl.TRIANGLES, 0, 4);
+	}
+
+	main();
+
+</script>
+</body>
+</html>

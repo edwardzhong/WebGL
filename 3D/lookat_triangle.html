@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<title>3d场景</title>
+</head>
+<body>
+<canvas id="canvas" width="400" height="400"></canvas>
+<script src="../js/webgl.js"></script>
+<script src="../js/matrix.js"></script>
+<script type="x-shader/x-vertex" id="vs">
+	attribute vec4 a_Position; //限定符，类型(4个浮点数的矢量)，变量名称：顶点，attribute变量传输与顶点有关的数据，表示逐顶点的信息(顶点依次传递给它的意思) 
+	// attribute float a_PositionSize;
+	uniform mat4 u_ViewMatrix;//视点矩阵
+	uniform mat4 u_ModelMatrix;//旋转矩阵
+	uniform mat4 u_ProjMatrix;//投影矩阵
+	attribute vec4 a_Color;
+	varying vec4 v_color;// 连接片元着色器
+	void main() { 
+		gl_Position = u_ProjMatrix * u_ViewMatrix * u_ModelMatrix * a_Position;
+		// gl_PointSize = a_PositionSize; 
+		v_color=a_Color;//传递给片元着色器变量
+	} 
+</script>
+<script type="x-shader/x-fragment" id="fs">
+	precision mediump float; // 精度限定
+	varying vec4 v_color; //从顶点着色器接收
+	void main() {
+		gl_FragColor = v_color;
+	}
+</script>
+<script>
+	var	canvas=document.getElementById('canvas'),
+		gl=get3DContext(canvas,true);
+
+	function main() {
+		if (!gl) {
+			console.log('Failed to get the rendering context for WebGL');
+			return;
+		}
+
+		if (!initShaders(gl, 'fs', 'vs')) {
+			console.log('Failed to intialize shaders.');
+			return;
+		}
+
+
+		/**
+		 * 混合缓冲区(包括顶点，尺寸，颜色)
+		 */
+		// 创建缓冲区并传人顶点
+		var verticeColors=new Float32Array([
+		     0.0,  0.5,  -0.4,  0.4,  1.0,  0.4, // The back green one
+		    -0.5, -0.5,  -0.4,  0.4,  1.0,  0.4,
+		     0.5, -0.5,  -0.4,  1.0,  0.4,  0.4, 
+		   
+		     0.5,  0.4,  -0.2,  1.0,  0.4,  0.4, // The middle yellow one
+		    -0.5,  0.4,  -0.2,  1.0,  1.0,  0.4,
+		     0.0, -0.6,  -0.2,  1.0,  1.0,  0.4, 
+
+		     0.0,  0.5,   0.0,  0.4,  0.4,  1.0,  // The front blue one 
+		    -0.5, -0.5,   0.0,  0.4,  0.4,  1.0,
+		     0.5, -0.5,   0.0,  1.0,  0.4,  0.4, 
+		]);
+		if(!createBuffer(verticeColors)){
+		    console.log('Failed to create the buffer object');
+		    return;
+		}
+
+		// 每个元素的字节
+		var FSIZE = verticeColors.BYTES_PER_ELEMENT;
+		// 获取顶点位置
+		var a_Position = gl.getAttribLocation(gl.program, 'a_Position');
+		// (地址,每个顶点分量的个数<1-4>,数据类型<整形，符点等>,是否归一化,指定相邻两个顶点间字节数<默认0>,指定缓冲区对象偏移字节数量<默认0>)
+		gl.vertexAttribPointer(a_Position, 3, gl.FLOAT, false, 6*FSIZE, 0);
+		// Enable the assignment to a_Position variable
+		gl.enableVertexAttribArray(a_Position);
+
+		// 获取a_Color变量的存储地址并赋值
+		var a_Color = gl.getAttribLocation(gl.program, 'a_Color');
+		gl.vertexAttribPointer(a_Color, 3, gl.FLOAT, false, 6*FSIZE, 3*FSIZE);
+		gl.enableVertexAttribArray(a_Color);
+
+	  var u_ViewMatrix = gl.getUniformLocation(gl.program, 'u_ViewMatrix');
+	  var u_ModelMatrix = gl.getUniformLocation(gl.program, 'u_ModelMatrix');
+	  var u_ProjMatrix = gl.getUniformLocation(gl.program, 'u_ProjMatrix');
+	  if(!u_ViewMatrix || !u_ModelMatrix || !u_ProjMatrix) { 
+	    console.log('Failed to get the storage location of u_viewMatrix or u_ModelMatrix or u_ProjMatrix');
+	    return;
+	  }
+	  var viewMatrix = new Matrix4();
+	  var modelMatrix = new Matrix4();
+	  var projMatrix = new Matrix4();
+	  // (视点，观察目标点，上方向)
+	  viewMatrix.setLookAt(0.20, 0.25, 0.25, 0, 0, 0, 0, 1, 0);
+	  // 旋转矩阵
+	  modelMatrix.setRotate(-30, 0, 0, 1);
+	  // 正视投影 (left,right,bottom,top,near,far), 组成一个正方体的可视空间 
+	  projMatrix.setOrtho(-1.0, 1.0, -1.0, 1.0, 0.0, 1.0);
+
+	  // 赋值
+	  gl.uniformMatrix4fv(u_ViewMatrix, false, viewMatrix.elements);
+	  gl.uniformMatrix4fv(u_ModelMatrix, false, modelMatrix.elements);
+	  gl.uniformMatrix4fv(u_ProjMatrix, false, projMatrix.elements);
+
+		//设置背景颜色，清屏
+		gl.clearColor(0.0, 0.0, 0.0, 1.0);
+		gl.clear(gl.COLOR_BUFFER_BIT);
+
+		// (基本图形，第几个顶点，执行几次)，修改基本图形项可以生成点，线，三角形，矩形，扇形等
+		gl.drawArrays(gl.TRIANGLES, 0, 9);
+	}
+
+	main();
+
+</script>
+</body>
+</html>

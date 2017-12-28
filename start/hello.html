@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<title>hello webGL</title>
+</head>
+<body>
+<canvas id="canvas" width="400" height="400"></canvas>
+<script src="../js/webgl.js"></script>
+<script>
+	var canvas=document.getElementById('canvas'),
+		gl=get3DContext(canvas,true),
+		VSHADER_SOURCE = //顶点着色器
+		  'void main() {\n' +
+		  '  gl_Position = vec4(0.0, 0.0, 0.0, 1.0);\n' +//位置
+		  '  gl_PointSize = 10.0;\n' +//尺寸
+		  '}\n',
+		FSHADER_SOURCE = //片段着色器
+		  'void main() {\n' +
+		  '  gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);\n' + //颜色
+		  '}\n';
+
+	function main(){
+		if(!gl){
+			console.log('Failed to get the rendering context for WebGL');
+			return;
+		}
+		// Initialize shaders
+		if (!initShaders(gl, VSHADER_SOURCE, FSHADER_SOURCE)) {
+			console.log('Failed to intialize shaders.');
+			return;
+		}
+		// 设置清屏颜色
+		gl.clearColor(0.0, 0.0, 0.0, 1.0);
+		// 清除屏幕  
+		gl.clear(gl.COLOR_BUFFER_BIT);
+		// 绘制
+		gl.drawArrays(gl.POINTS,0,1);  
+	}
+	
+	function initShaders(gl, vshader, fshader) {
+	  var program = createProgram(gl, vshader, fshader);
+	  if (!program) {
+	    console.log('Failed to create program');
+	    return false;
+	  }
+	  // 使用程序对象
+	  gl.useProgram(program);
+	  gl.program = program;
+
+	  return true;
+	}
+
+	main();
+</script>
+</body>
+</html>

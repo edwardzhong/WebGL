@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<title>鼠标点击</title>
+</head>
+<body>
+<canvas id="canvas" width="400" height="400"></canvas>
+<script src="../js/webgl.js"></script>
+<script>
+	var	VSHADER_SOURCE = 
+			'attribute vec4 a_Position;\n' + //限定符，类型，变量名称：attribute变量传输与顶点有关的数据 uniform变量传输的是所有顶点(或与顶点无关)都相同的数据
+			'attribute float a_PositionSize;\n'+
+			'void main() {\n' +
+			'  gl_Position = a_Position;\n' +
+			'  gl_PointSize = a_PositionSize;\n' +
+			'}\n', 
+		FSHADER_SOURCE = 
+		  'precision mediump float;\n' + // 精度限定
+		  'uniform vec4 u_FragColor;\n' +  // 限定符，类型，变量名称: uniform变量，不能使用attribute变量
+		  'void main() {\n' +
+		  '  gl_FragColor = u_FragColor;\n' +
+		  '}\n',
+		a_Position=null,
+		u_FragColor=null,
+		points=[],
+		canvas=document.getElementById('canvas'),
+		gl=get3DContext(canvas,true);
+
+	function main() {
+		if (!gl) {
+			console.log('Failed to get the rendering context for WebGL');
+			return;
+		}
+
+		if (!initShaders(gl, VSHADER_SOURCE, FSHADER_SOURCE)) {
+			console.log('Failed to intialize shaders.');
+			return;
+		}
+
+		// 获取attribute变量的存储位置（程序对象，attribute变量名称）
+		a_Position = gl.getAttribLocation(gl.program, 'a_Position');
+		if (a_Position < 0) {
+			console.log('Failed to get the storage location of a_Position');
+			return;
+		}
+
+		// 获取attribute变量的尺寸，并赋值
+		var a_PositionSize = gl.getAttribLocation(gl.program, 'a_PositionSize');
+		gl.vertexAttrib1f(a_PositionSize, 8.0);
+
+		// 获取 u_FragColor变量的存储地址
+		u_FragColor = gl.getUniformLocation(gl.program, 'u_FragColor');
+		if (!u_FragColor) {
+			console.log('Failed to get the storage location of u_FragColor');
+			return;
+		}
+
+		gl.clearColor(0.0, 0.0, 0.0, 1.0);
+		gl.clear(gl.COLOR_BUFFER_BIT);
+	}
+
+	main();
+
+	function initShaders(gl, vshader, fshader) {
+	  var program = createProgram(gl, vshader, fshader);
+	  if (!program) {
+	    console.log('Failed to create program');
+	    return false;
+	  }
+	  // 使用程序对象
+	  gl.useProgram(program);
+	  gl.program = program;
+
+	  return true;
+	}
+
+	canvas.addEventListener('click',function(e){
+		var point=WindowToWebgl(canvas,e.clientX,e.clientY);
+		if (point.x >= 0.0 && point.y >= 0.0) {      // First quadrant
+			point.color=[1.0, 0.0, 0.0, 1.0];  // Red
+		} else if (point.x < 0.0 && point.y < 0.0) { // Third quadrant
+			point.color=[0.0, 1.0, 0.0, 1.0];  // Green
+		} else {                         // Others
+			point.color=[1.0, 1.0, 1.0, 1.0];  // White
+		}
+
+		points.push(point);
+		gl.clear(gl.COLOR_BUFFER_BIT);
+		points.forEach(p=>{
+			// 将顶点位置赋给attribute变量的存储位置，3f表述3个float型参数
+			gl.vertexAttrib3f(a_Position, p.x,p.y,0.0);
+			gl.uniform4f(u_FragColor, p.color[0], p.color[1], p.color[2], p.color[3]);
+			gl.drawArrays(gl.POINTS, 0, 1);
+		});
+	},false);
+
+</script>
+</body>
+</html>

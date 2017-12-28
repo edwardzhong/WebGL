@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<title>顶点尺寸颜色(单一缓冲区)</title>
+</head>
+<body>
+<h3>用一个缓冲区交叉存储顶点尺寸颜色数据，适合数据量大的情况</h3>
+<canvas id="canvas" width="400" height="400"></canvas>
+<script src="../js/webgl.js"></script>
+<script type="x-shader/x-vertex" id="vs">
+	attribute vec4 a_Position; //限定符，类型(4个浮点数的矢量)，变量名称：顶点，attribute变量传输与顶点有关的数据，表示逐顶点的信息(顶点依次传递给它的意思) 
+	attribute float a_PositionSize;
+	attribute vec4 a_Color;
+	varying vec4 v_color;// 连接片元着色器
+	void main() { 
+		gl_Position = a_Position;
+		gl_PointSize = a_PositionSize; 
+		v_color=a_Color;//传递给片元着色器变量
+	} 
+</script>
+<script type="x-shader/x-fragment" id="fs">
+	precision mediump float; // 精度限定
+	varying vec4 v_color; //从顶点着色器接收
+	void main() {
+		gl_FragColor = v_color;
+	}
+</script>
+<script>
+	var	canvas=document.getElementById('canvas'),
+		gl=get3DContext(canvas,true);
+
+	function main() {
+		if (!gl) {
+			console.log('Failed to get the rendering context for WebGL');
+			return;
+		}
+
+		if (!initShaders(gl, 'fs', 'vs')) {
+			console.log('Failed to intialize shaders.');
+			return;
+		}
+
+		/**
+		 * 混合缓冲区(包括顶点，尺寸，颜色)
+		 */
+		// 创建缓冲区并传人顶点
+		var verticeSizeColors=new Float32Array([
+			-0.5, 0.5, 10, 1, 0, 0, 1,
+			-0.5, -0.5, 20, 0, 1, 0, 1,
+			0.5, 0.5, 30, 0, 0, 1, 1,
+			0.5, -0.5, 40, 1, 1, 0, 1
+		]);
+		if(!createBuffer(verticeSizeColors)){
+		    console.log('Failed to create the buffer object');
+		    return;
+		}
+
+		// 每个元素的字节
+		var FSIZE = verticeSizeColors.BYTES_PER_ELEMENT;
+		// 获取顶点位置
+		var a_Position = gl.getAttribLocation(gl.program, 'a_Position');
+		// (地址,每个顶点分量的个数<1-4>,数据类型<整形，符点等>,是否归一化,指定相邻两个顶点间字节数<默认0>,指定缓冲区对象偏移字节数量<默认0>)
+		gl.vertexAttribPointer(a_Position, 2, gl.FLOAT, false, 7*FSIZE, 0);
+		// Enable the assignment to a_Position variable
+		gl.enableVertexAttribArray(a_Position);
+
+		// 获取attribute变量的尺寸，并赋值
+		var a_PositionSize = gl.getAttribLocation(gl.program, 'a_PositionSize');
+		gl.vertexAttribPointer(a_PositionSize, 1, gl.FLOAT, false, 7*FSIZE, 2*FSIZE);
+		gl.enableVertexAttribArray(a_PositionSize);
+
+		// 获取a_Color变量的存储地址并赋值
+		var a_Color = gl.getAttribLocation(gl.program, 'a_Color');
+		gl.vertexAttribPointer(a_Color, 4, gl.FLOAT, false, 7*FSIZE, 3*FSIZE);
+		gl.enableVertexAttribArray(a_Color);
+
+		//设置背景颜色，清屏
+		gl.clearColor(0.0, 0.0, 0.0, 1.0);
+		gl.clear(gl.COLOR_BUFFER_BIT);
+
+		// (基本图形，第几个顶点，执行几次)，修改基本图形项可以生成点，线，三角形，矩形，扇形等
+		gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+	}
+
+	main();
+
+</script>
+</body>
+</html>
