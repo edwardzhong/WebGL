@@ -126,7 +126,31 @@
 			requestAnimationFrame(animate);
 		}());
 	}
+	/**
+	* 创建缓冲区
+	* @param  {Array} data
+	* @param  {Object} bufferType
+	* @return {Object}     
+	*/
+	function createBuffer(data,bufferType){  
+		// 生成缓存对象  
+		var buffer = gl.createBuffer();  
+		if (!buffer) {
+			console.log('Failed to create the buffer object');
+			return null;
+		}
+		// 绑定缓存(gl.ARRAY_BUFFER<顶点>||gl.ELEMENT_ARRAY_BUFFER<顶点索引>) 
+		gl.bindBuffer(bufferType||gl.ARRAY_BUFFER, buffer);  
 
+		// 向缓存中写入数据  
+		gl.bufferData(bufferType||gl.ARRAY_BUFFER, data, gl.STATIC_DRAW);  
+
+		// 将绑定的缓存设为无效  
+		// gl.bindBuffer(gl.ARRAY_BUFFER, null);  
+
+		// 返回生成的buffer  
+		return buffer;
+	} 
 	main();
 
 </script>
