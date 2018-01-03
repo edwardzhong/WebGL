@@ -13,7 +13,7 @@
  * Ka 环境色  rgb
  * Kd 漫反射色,材质颜色  rgb
  * Ks 高光色，材质高光颜色 rgb
- * Ns 反射高光度 指定材质的反射指数
+ * Ns 材质的反射指数shininess
  * Ni 折射值 指定材质表面的光密度
  * d 透明度  
  * illum  光照模型
@@ -314,16 +314,20 @@
                     name = this.parseNewmtl(sp); // Get name
                     material = new Material(name);
                     continue; // Go to the next line
-                case 'Kd': // Read normal
-                    if (name == "") continue; // Go to the next line because of Error
+                case 'Ns'://反射指数
+                    if (name == "") continue;
+                    material.shininess=sp.getFloat();
+                    continue;
+                case 'Kd': //法线
+                    if (name == "") continue;
                     material.color = this.parseRGB(sp);
-                    continue; // Go to the next line
-                case 'Ks':
-                    if (name == "") continue; // Go to the next line because of Error
+                    continue;
+                case 'Ks': //高光
+                    if (name == "") continue;
                     material.sColor = this.parseRGB(sp);
-                    continue; // Go to the next line
-                case 'd':
-                    if (name == "") continue; // Go to the next line because of Error
+                    continue;
+                case 'd'://透明度
+                    if (name == "") continue;
                     material.setOpacity(sp);
                     this.materials[name] = material;;
                     name = "";

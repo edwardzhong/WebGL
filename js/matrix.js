@@ -718,19 +718,21 @@
         this.elements = v;
     }
 
+    var output={
+        Matrix4:Matrix4,
+        Vector3:Vector3,
+        Vector4:Vector4
+    };
+
     if (typeof module !== 'undefined' && module.exports) {
-        exports.Matrix4 = Matrix4;
-        exports.Vector3 = Vector3;
-        exports.Vector4 = Vector4;
+        module.exports=output;
     } else if (typeof define === 'function' && typeof define.amd === 'object' && define.amd) {
         define(function() {
-            exports.Matrix4 = Matrix4;
-            exports.Vector3 = Vector3;
-            exports.Vector4 = Vector4;
+            return output;
         });
     } else {
-        window.Matrix4 = Matrix4;
-        window.Vector3 = Vector3;
-        window.Vector4 = Vector4;
+        for(var n in output){
+            window[n]=output[n];
+        }
     }
 }());

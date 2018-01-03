@@ -18,7 +18,7 @@
   varying vec3 v_Normal;
   varying vec3 v_Position;
   void main() {
-    vec4 color = vec4(1.0, 1.0, 1.0, 1.0);
+    vec4 color = vec4(0.0, 1.0, 1.0, 1.0);
     gl_Position = u_MvpMatrix * a_Position;
     // 计算顶点在世界坐标系的位置，以便计算点光源在顶点处点位置
     v_Position = vec3(u_ModelMatrix * a_Position);
@@ -49,13 +49,14 @@
     gl_FragColor = vec4(diffuse + ambient, v_Color.a);
 
     // 观察方向的单位向量V
-    vec3 eyeDirection = normalize(-v_Position);
+    // vec3 eyeDirection = normalize(-v_Position);
+    vec3 eyeDirection = vec3(0.0,0.0,1.0);
     // 反射方向
     vec3 reflectionDirection = reflect(-lightDirection, normal);
     vec3 specularColor =vec3(1.0,1.0,1.0);//镜面反射光颜色
-    float materialShininess = 30.0;// 镜面反射光泽度
+    float shininess = 30.0;// 镜面反射光泽度
     // 镜面反射亮度权重
-    float specularLightWeighting = pow(max(dot(reflectionDirection, eyeDirection), 0.0), materialShininess);
+    float specularLightWeighting = pow(max(dot(reflectionDirection, eyeDirection), 0.0), shininess);
     // 镜面高光亮度
     vec3 specular =  specularColor.rgb * specularLightWeighting * (nDotL<=0.0?0.0:1.0);
     gl_FragColor = vec4(ambient + diffuse + specular, v_Color.a);
@@ -71,7 +72,7 @@
 			return;
 		}
 
-		if (!initShaders(gl, 'fs', 'vs')) {
+		if (!initProgram(gl, 'fs', 'vs',true)) {
 			console.log('Failed to intialize shaders.');
 			return;
 		}
@@ -99,7 +100,7 @@
 		}
 
 		// 光照颜色
-		gl.uniform3f(u_LightColor, 0.8, 0.8, 0.8);
+		gl.uniform3f(u_LightColor, 1, 1, 1);
 		// 光线方向(世界坐标系下)
 		gl.uniform3f(u_LightPosition, 5.0, 4.0, 7.0);
 		// 设置环境光颜色
@@ -137,7 +138,7 @@
 	}
 
 	function initVertexBuffers() { // Create a sphere
-	  var SPHERE_DIV = 13;
+	  var SPHERE_DIV = 15;
 
 	  var i, ai, si, ci;
 	  var j, aj, sj, cj;

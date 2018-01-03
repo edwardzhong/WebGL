@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<title>使用webGL2语法绘制三角形</title>
+</head>
+<body>
+<canvas id="canvas" width="400" height="400"></canvas>
+<script src="../js/webgl.js"></script>
+<script type="x-shader/x-vertex" id="vs">
+	attribute vec4 a_Position;
+	attribute vec4 a_Color;
+	varying vec4 v_Color;
+	void main() { 
+		gl_Position=a_Position;
+		v_Color=a_Color;
+	} 
+</script>
+<script type="x-shader/x-fragment" id="fs">
+	precision mediump float;
+	varying vec4 v_Color;
+	void main() {
+		// gl_FragColor = vec4(1,1,1,1);
+		gl_FragColor = v_Color;
+	}
+</script>
+<script>
+	var	canvas=document.getElementById('canvas'),
+		gl=get3DContext(canvas,true);
+
+	function main() {
+		if (!gl) {
+			console.log('Failed to get the rendering context for WebGL');
+			return;
+		}
+
+		if (!initProgram(gl, 'fs', 'vs',true)) {
+			console.log('Failed to intialize shaders.');
+			return;
+		}
+		gl.clearColor(0.0, 0.0, 0.0, 1.0);
+		var a_Position = gl.getAttribLocation(gl.program, 'a_Position');
+		var a_Color = gl.getAttribLocation(gl.program, 'a_Color');
+
+		// 第一组数据
+		var triangleArray = gl.createVertexArray();
+		gl.bindVertexArray(triangleArray);
+		initOne(a_Position,a_Color);
+
+		// 第二组数据
+		var triangleArray2 = gl.createVertexArray();
+		gl.bindVertexArray(triangleArray2);
+		initSecond(a_Position,a_Color);
+
+		////////////////
+		// DRAW
+		////////////////
+		gl.clear(gl.COLOR_BUFFER_BIT);
+
+		gl.bindVertexArray(triangleArray);
+		gl.drawArrays(gl.TRIANGLES, 0, 3);
+
+		gl.bindVertexArray(triangleArray2);
+		gl.drawArrays(gl.TRIANGLES, 0, 3);
+	}
+
+	function initOne(a_Position,a_Color){
+		var positions = new Float32Array([
+			-0.5, -0.5, 0.0,
+		    0.0, -0.5, 0.0,
+		    0.0, 0.0, 0.0
+		]);
+		initBuffer(a_Position,positions,3);
+
+		var colors = new Float32Array([
+		    1.0, 0.0, 0.0,
+		    0.0, 1.0, 0.0,
+		    0.0, 0.0, 1.0
+		]);
+		initBuffer(a_Color,colors,3);		
+	}
+
+	function initSecond(a_Position,a_Color){
+		var positions2 = new Float32Array([
+		    0.0, 0.0, 0.0,
+		    0.5, 0.0, 0.0,
+		    0.0, 0.5, 0.0
+		]);
+		initBuffer(a_Position,positions2,3);
+		var colors2 = new Float32Array([
+		    1.0, 1.0, 0.0,
+		    0.0, 1.0, 1.0,
+		    0.0, 1.0, 1.0
+		]);
+		initBuffer(a_Color,colors2,3);
+	}
+	
+	function initBuffer(attribute,data,num){
+		var buffer = gl.createBuffer();
+		gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+		gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW);
+		gl.vertexAttribPointer(attribute, num, gl.FLOAT, false, 0, 0);
+		gl.enableVertexAttribArray(attribute);
+	}
+
+	main();
+
+</script>
+</body>
+</html>

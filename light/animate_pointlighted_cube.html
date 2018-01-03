@@ -41,7 +41,7 @@
     // 对法线归一化，因为其内插之后长度不一定是1
     vec3 normal = normalize(v_Normal);
     // 计算光线方向(光源位置-顶点位置)并归一化
-    vec3 lightDirection = normalize(u_LightPosition - v_Position);
+    vec3 lightDirection = normalize(u_LightPosition - v_Position.xyz);
     // 计算光线方向和法向量点积
     float nDotL = max(dot(lightDirection, normal), 0.0);
     // 计算光照颜色
@@ -50,16 +50,15 @@
     // gl_FragColor = vec4(diffuse + ambient, v_Color.a);
     
     // 观察方向的单位向量V
-    vec3 eyeDirection = normalize(-v_Position);
-    // 反射方向
+    // vec3 eyeDirection = normalize(-v_Position.xyz);// 反射方向
+    vec3 eyeDirection = vec3(0.0,0.1,1.0);
     vec3 reflectionDirection = reflect(-lightDirection, normal);
     vec3 specularColor =vec3(1.0,1.0,1.0);//镜面反射光颜色
-    float materialShininess = 30.0;// 镜面反射光泽度
     // 镜面反射亮度权重
-    float specularLightWeighting = pow(max(dot(reflectionDirection, eyeDirection), 0.0), materialShininess);
+    float specularWeighting = pow(max(dot(reflectionDirection, eyeDirection), 0.0), 100.0);
     // 镜面高光亮度
-    vec3 specular =  specularColor.rgb * specularLightWeighting * (nDotL<=0.0?0.0:1.0);
-    gl_FragColor = vec4(ambient + diffuse + specular, v_Color.a);
+    vec3 specular =  specularColor.rgb * specularWeighting * (nDotL<=0.0?0.0:1.0);
+    gl_FragColor = vec4(ambient + diffuse + specular, 1.0);
   }
 </script>
 <script>
@@ -72,22 +71,20 @@
 			return;
 		}
 
-		if (!initShaders(gl, 'fs', 'vs')) {
+		if (!initProgram(gl, 'fs', 'vs',true)) {
 			console.log('Failed to intialize shaders.');
 			return;
 		}
 
-		var n=initVertexBuffers();
-		if(n<0){
-			console.log('Failed to set the vertex information');
-			return;
-		}
-		// 设置背景颜色
-		gl.clearColor(0.0, 0.0, 0.0, 1.0);
-		// 开启隐藏面消除
-		gl.enable(gl.DEPTH_TEST);
+    	var a_Position = gl.getAttribLocation(gl.program, 'a_Position');
+	    var a_Color = gl.getAttribLocation(gl.program, 'a_Color');
+	    var a_Normal = gl.getAttribLocation(gl.program, 'a_Normal');
+	    if (a_Position < 0 || a_Color < 0 || a_Normal < 0) {
+	        console.log('Failed to get the storage attribute location ');
+	        return;
+	    }
 
-		// 获取变量地址
+    	// 获取变量地址
 		var u_ModelMatrix = gl.getUniformLocation(gl.program, 'u_ModelMatrix');
 		var u_MvpMatrix = gl.getUniformLocation(gl.program, 'u_MvpMatrix');
 		var u_NormalMatrix = gl.getUniformLocation(gl.program, 'u_NormalMatrix');
@@ -99,12 +96,22 @@
 			return;
 		}
 
+		var buffers=initVertexBuffers(gl);
+		buffers.outputPosition(a_Position);
+		buffers.outputColor(a_Color);
+		buffers.outputNormals(a_Normal);
+		buffers.outputIndex();
+		
+		// 设置背景颜色
+		gl.clearColor(0.0, 0.0, 0.0, 1.0);
+		// 开启隐藏面消除
+		gl.enable(gl.DEPTH_TEST);
 		// 光照颜色
 		gl.uniform3f(u_LightColor, 1.0, 1.0, 1.0);
 		// 光线方向(世界坐标系下)
-		gl.uniform3f(u_LightPosition, 4.0, 4.0, 4.0);
+		gl.uniform3f(u_LightPosition, 0.0, 1.0, 6.0);
 		// 设置环境光颜色
-		gl.uniform3f(u_AmbientLight, 0.2, 0.2, 0.2);
+		gl.uniform3f(u_AmbientLight, 0.1, 0.1, 0.1);
 
 		var modelMatrix = new Matrix4();
 		var mvpMatrix = new Matrix4(); 
@@ -116,7 +123,7 @@
 			modelMatrix.setRotate((angle++)%360, 0, 1, 0); // Rotate around the y-axis
 			// 视点投影
 			mvpMatrix.setPerspective(30, canvas.width/canvas.height, 1, 100);
-			mvpMatrix.lookAt(0, 6, 14, 0, 0, 0, 0, 1, 0);
+			mvpMatrix.lookAt(0, 6, 12, 0, 0, 0, 0, 1, 0);
 			mvpMatrix.multiply(modelMatrix);
 			// 根据模型矩阵计算用来变换法向量的矩阵
 			normalMatrix.setInverseOf(modelMatrix);
@@ -133,14 +140,14 @@
 			gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
 			// 根据顶点索引绘制图形(图形类型，绘制顶点个数，顶点索引数据类型，顶点索引中开始绘制的位置)
-			gl.drawElements(gl.TRIANGLES, n, gl.UNSIGNED_BYTE, 0);
+			gl.drawElements(gl.TRIANGLES, buffers.num, gl.UNSIGNED_BYTE, 0);
 
 			// gl.drawArrays(gl.TRIANGLES, 0, 9);
 			requestAnimationFrame(animate);
 		}());
 	}
 
-	function initVertexBuffers() { // Create a sphere
+	function initVertexBuffers(gl) { // Create a sphere
 		// Create a cube
 		//    v6----- v5
 		//   /|      /|
@@ -189,72 +196,27 @@
 			20,21,22,  20,22,23     // back
 		]);
 
-		// 创建顶点缓冲
-		if(!initArrayBuffer('a_Position',vertices,3,gl.FLOAT)){
-			return -1;
-		}
-		// 创建颜色缓冲
-		if(!initArrayBuffer('a_Color',colors,3,gl.FLOAT)){
-			return -1;
-		}
-		// 创建法向量缓冲
-		if (!initArrayBuffer('a_Normal', normals, 3, gl.FLOAT)) {
-			return -1;
-		}
-		  // Unbind the buffer object
-		  // gl.bindBuffer(gl.ARRAY_BUFFER, null);
-
-
-		//创建顶点索引缓冲
-		if(!createBuffer(indices,gl.ELEMENT_ARRAY_BUFFER)){
-		    console.log('Failed to create the buffer object');
-		    return -1;
-		}
-
-		return indices.length;
-	}
-
-	/**
-	* 创建缓冲区
-	* @param  {Array} data
-	* @param  {Object} bufferType
-	* @return {Object}     
-	*/
-	function createBuffer(data,bufferType){  
-		// 生成缓存对象  
-		var buffer = gl.createBuffer();  
-		if (!buffer) {
-			console.log('Failed to create the buffer object');
-			return null;
-		}
-		// 绑定缓存(gl.ARRAY_BUFFER<顶点>||gl.ELEMENT_ARRAY_BUFFER<顶点索引>) 
-		gl.bindBuffer(bufferType||gl.ARRAY_BUFFER, buffer);  
-
-		// 向缓存中写入数据  
-		gl.bufferData(bufferType||gl.ARRAY_BUFFER, data, gl.STATIC_DRAW);  
-
-		// 将绑定的缓存设为无效  
-		// gl.bindBuffer(gl.ARRAY_BUFFER, null);  
-
-		// 返回生成的buffer  
-		return buffer;
-	} 
-	function initArrayBuffer(attribute,data,num,type){
-  		// 创建顶点缓冲
-		if(!createBuffer(data)){
-		    console.log('Failed to create the buffer object');
-		    return false;
-		}
-
-		var a_attribute = gl.getAttribLocation(gl.program, attribute);
-		if (a_attribute < 0) {
-			console.log('Failed to get the storage location of ' + attribute);
-			return false;
-		}
-		// (地址,每个顶点分量的个数<1-4>,数据类型<整形，符点等>,是否归一化,指定相邻两个顶点间字节数<默认0>,指定缓冲区对象偏移字节数量<默认0>)
-		gl.vertexAttribPointer(a_attribute, num, type, false, 0, 0);
-		gl.enableVertexAttribArray(a_attribute);
-		return true;		
+		return createBuffer(gl,{
+        	position:{
+	            data:vertices,
+	            num:3,
+	            type:gl.FLOAT
+	        },
+	        color:{
+	            data:colors,
+	            num:3,
+	            type:gl.FLOAT
+	        },
+	        indices:{
+	            data:indices,
+	            type:gl.UNSIGNED_BYTE
+	        },
+	        normals:{
+	            data:normals,
+	            num:3,
+	            type:gl.FLOAT
+	        }
+	    });
 	}
 
 	main();

@@ -94,6 +94,21 @@
 			gl.drawArrays(gl.POINTS, 0, 1);
 		});
 	},false);
+	 function WindowToWebgl(canvas, x, y) {
+        if (!canvas) {
+            console.log('canvas not exist');
+            return { x: 0, y: 0 };
+        }
+        var box = canvas.getBoundingClientRect(),
+            w = canvas.width,
+            h = canvas.height,
+            x1 = x - box.left * (w / box.width),
+            y1 = y - box.top * (h / box.height);
+        return {
+            x: (x1 - w / 2) / (w / 2),
+            y: (h / 2 - y1) / (h / 2)
+        };
+    }
 
 </script>
 </body>

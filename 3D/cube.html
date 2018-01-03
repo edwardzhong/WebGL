@@ -37,7 +37,7 @@
 			return;
 		}
 
-		if (!initShaders(gl, 'fs', 'vs')) {
+		if (!initProgram(gl, 'fs', 'vs',true)) {
 			console.log('Failed to intialize shaders.');
 			return;
 		}

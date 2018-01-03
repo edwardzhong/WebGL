@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>shadow mapping绘制阴影</title>
+</head>
+<body>
+<canvas id="canvas" width="400" height="400"></canvas>
+<script src="../js/webgl.js"></script>
+<script src="../js/matrix.js"></script>
+<script type="x-shader/x-vertex" id="svs">
+    attribute vec4 a_Position; 
+    uniform mat4 u_MvpMatrix; 
+    void main() { 
+        gl_Position = u_MvpMatrix * a_Position; 
+    }
+</script>
+<script type="x-shader/x-fragment" id="sfs">
+    #ifdef GL_ES 
+    precision mediump float; 
+    #endif
+    void main() { 
+        gl_FragColor = vec4(gl_FragCoord.z, 0.0, 0.0, 0.0); //将深度值z存放到第一个分量r中
+    }
+</script>
+<script type="x-shader/x-vertex" id="vs">
+    attribute vec4 a_Position;
+    attribute vec4 a_Color;
+    uniform mat4 u_MvpMatrix;
+    uniform mat4 u_MvpMatrixFromLight;
+    varying vec4 v_PositionFromLight;
+    varying vec4 v_Color;
+    void main() {
+        gl_Position = u_MvpMatrix * a_Position; 
+        v_PositionFromLight = u_MvpMatrixFromLight * a_Position;
+        v_Color = a_Color;
+    }
+</script>
+<script type="x-shader/x-fragment" id="fs">
+    #ifdef GL_ES
+    precision mediump float;
+    #endif
+    uniform sampler2D u_ShadowMap;
+    varying vec4 v_PositionFromLight;
+    varying vec4 v_Color;
+    void main() {
+        //获取对应的阴影坐标,这是gl_FragCoord的计算方式
+        vec3 shadowCoord = (v_PositionFromLight.xyz/v_PositionFromLight.w)/2.0 + 0.5;
+        //根据阴影xy坐标,获取纹理中对应的点,z值已经被之前的阴影着色器存放在该点的r分量中了,直接使用即可
+        vec4 rgbaDepth = texture2D(u_ShadowMap, shadowCoord.xy);
+        float visibility = (shadowCoord.z > rgbaDepth.r + 0.005) ? 0.7 : 1.0;
+        gl_FragColor = vec4(v_Color.rgb * visibility, v_Color.a);
+    }
+</script>
+<script>    
+var canvas = document.getElementById('canvas'),
+    gl = get3DContext(canvas),
+    OFFSCREEN_WIDTH = 2048,
+    OFFSCREEN_HEIGHT = 2048,
+    LIGHT_POS=[0,7,2],
+    VIEW_POS=[0,7,9],
+    g_modelMatrix = new Matrix4(),
+    g_mvpMatrix = new Matrix4();
+
+function main() {
+    if (!gl) {
+        console.log('Failed to get the rendering context for WebGL');
+        return;
+    }
+
+    // 初始化阴影着色器,创建对应program
+    var shadowShaders = getShaderString('svs', 'sfs');
+    if(!shadowShaders.length)return;
+    var shadowProgram=initProgram(gl,shadowShaders,
+        ['a_Position'],
+        ['u_MvpMatrix']);
+
+    // 初始化普通着色器,创建对应program
+    var normalShaders = getShaderString('vs', 'fs');
+    if(!normalShaders.length)return;
+    var normalProgram=initProgram(gl,normalShaders,
+        ['a_Position','a_Color',],
+        ['u_MvpMatrix','u_MvpMatrixFromLight','u_ShadowMap']);
+
+    // 获取对应图形的缓冲区对象
+    var triangleBuffers = initVertexBuffersForTriangle(gl);
+    var planeBuffers = initVertexBuffersForPlane(gl);
+
+    // 初始化帧缓冲区对象 (FBO)  
+    var fbo = initFramebufferObject(gl);
+    if (!fbo) {
+        console.log('Failed to initialize frame buffer object');
+        return;
+    }
+
+    gl.activeTexture(gl.TEXTURE0); // Set a texture object to the texture unit
+    gl.bindTexture(gl.TEXTURE_2D, fbo.texture);
+
+    // Set the clear color and enable the depth test
+    gl.clearColor(0, 0, 0, 1);
+    gl.enable(gl.DEPTH_TEST);
+
+    var viewProjMatrixFromLight = new Matrix4(); // Prepare a view projection matrix for generating a shadow map
+    viewProjMatrixFromLight.setPerspective(70.0, OFFSCREEN_WIDTH / OFFSCREEN_HEIGHT, 1.0, 100.0);
+    viewProjMatrixFromLight.lookAt(...LIGHT_POS, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0);
+
+    var viewProjMatrix = new Matrix4(); // Prepare a view projection matrix for regular drawing
+    viewProjMatrix.setPerspective(45, canvas.width / canvas.height, 1.0, 100.0);
+    viewProjMatrix.lookAt(...VIEW_POS, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0);
+
+    var mvpMatrixFromLight_t = new Matrix4(); // A model view projection matrix from light source (for triangle)
+    var mvpMatrixFromLight_p = new Matrix4(); // A model view projection matrix from light source (for plane)
+    
+    var angle=0,ANGLE_STEP = 40, last = Date.now();
+    (function animate(){
+        var now = new Date(),
+            elapsed = now - last;
+
+        last = now;
+        angle += ANGLE_STEP * elapsed / 1000;
+        angle %= 360;
+
+        gl.bindFramebuffer(gl.FRAMEBUFFER, fbo); // Change the drawing destination to FBO
+        gl.viewport(0, 0, OFFSCREEN_HEIGHT, OFFSCREEN_HEIGHT); // Set view port for FBO
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT); // Clear FBO    
+        /*
+            阴影着色器
+         */ 
+        gl.useProgram(shadowProgram); // Set shaders for generating a shadow map
+
+        // 三角形
+        g_modelMatrix.setRotate(angle, 0, 1, 0);
+        draw(gl, shadowProgram, triangleBuffers, viewProjMatrixFromLight);
+        mvpMatrixFromLight_t.set(g_mvpMatrix); // Used later
+
+        // 平面
+        g_modelMatrix.setRotate(-30, 0, 1, 1);
+        draw(gl, shadowProgram, planeBuffers, viewProjMatrixFromLight);
+        mvpMatrixFromLight_p.set(g_mvpMatrix); // Used later
+
+        // 将帧缓冲区切换为正常的缓冲区
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null); // Change the drawing destination to color buffer
+        gl.viewport(0, 0, canvas.width, canvas.height);
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT); // Clear color and depth buffer
+        
+        /*
+            正常的着色器
+         */ 
+        gl.useProgram(normalProgram); // Set the shader for regular drawing
+        gl.uniform1i(normalProgram.u_ShadowMap, 0); // Pass 0 because gl.TEXTURE0 is enabled
+        
+        // 三角形
+        gl.uniformMatrix4fv(normalProgram.u_MvpMatrixFromLight, false, mvpMatrixFromLight_t.elements);
+        g_modelMatrix.setRotate(angle, 0, 1, 0);
+        draw(gl, normalProgram, triangleBuffers, viewProjMatrix);
+        
+        // 平面
+        gl.uniformMatrix4fv(normalProgram.u_MvpMatrixFromLight, false, mvpMatrixFromLight_p.elements);
+        g_modelMatrix.setRotate(-30, 0, 1, 1);
+        draw(gl, normalProgram, planeBuffers, viewProjMatrix);
+
+        requestAnimationFrame(animate);
+    }())
+}
+
+function draw(gl, program, buffer, viewProjMatrix) {
+    // 输出attribute对应的数据缓冲
+    program.attr.forEach((item,i)=>{
+        if(item.name=='a_Position'){
+            buffer.outputVertex(item.loc);
+        }
+        if(item.name=='a_Color'){
+            buffer.outputColor(item.loc);
+        }
+    });
+
+    //输出顶点索引缓冲
+    buffer.outputIndex();
+
+    // Calculate the model view project matrix and pass it to u_MvpMatrix
+    g_mvpMatrix.set(viewProjMatrix);
+    g_mvpMatrix.multiply(g_modelMatrix);
+    gl.uniformMatrix4fv(program.u_MvpMatrix, false, g_mvpMatrix.elements);
+
+    gl.drawElements(gl.TRIANGLES, buffer.num, gl.UNSIGNED_BYTE, 0);
+}
+
+function initVertexBuffersForPlane(gl) {
+    // Create a plane
+    //  v1------v0
+    //  |        | 
+    //  |        |
+    //  |        |
+    //  v2------v3
+    // var planeArray = gl.createVertexArray();
+    // gl.bindVertexArray(planeArray);
+    // Vertex coordinates
+    var vertices = new Float32Array([
+        3.0, -1, 3.0, -3.0, -1, 3.0, -3.0, -1, -3.0, 3.0, -1, -3.0 // v0-v1-v2-v3
+    ]);
+    // Colors
+    var colors = new Float32Array([
+        1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0
+    ]);
+    // Indices of the vertices
+    var indices = new Uint8Array([0, 1, 2, 0, 2, 3]);
+    return new VertexBuffers(gl,
+        {
+            data:vertices,
+            num:3,
+            type:gl.FLOAT
+        },{
+            data:colors,
+            num:3,
+            type:gl.FLOAT
+        },{
+            data:indices,
+            type:gl.UNSIGNED_BYTE
+        });
+}
+
+function initVertexBuffersForTriangle(gl) {
+    // Create a triangle
+    //       v2
+    //      / | 
+    //     /  |
+    //    /   |
+    //  v0----v1
+
+    // Vertex coordinates
+    var vertices = new Float32Array([-0.8, 3.5, 0.0, 0.8, 3.5, 0.0, 0.0, 3.5, 1.8]);
+    // Colors
+    var colors = new Float32Array([1.0, 0.5, 0.0, 1.0, 0.5, 0.0, 1.0, 0.0, 0.0]);
+    // Indices of the vertices
+    var indices = new Uint8Array([0, 1, 2]);
+    return new VertexBuffers(gl,
+        {
+            data:vertices,
+            num:3,
+            type:gl.FLOAT
+        },{
+            data:colors,
+            num:3,
+            type:gl.FLOAT
+        },{
+            data:indices,
+            type:gl.UNSIGNED_BYTE
+        });
+}
+
+main();
+</script>
+</body>
+
+</html>
