@@ -6,13 +6,13 @@
 </head>
 <body>
 <canvas id="canvas" width="400" height="400"></canvas>
-<script src="../js/webgl.js"></script>
+<script src="../js/webgl-util.js"></script>
 <script src="../js/matrix.js"></script>
 <script type="x-shader/x-vertex" id="svs">
-    attribute vec4 a_Position; 
+    attribute vec4 a_position; 
     uniform mat4 u_MvpMatrix; 
     void main() { 
-        gl_Position = u_MvpMatrix * a_Position; 
+        gl_Position = u_MvpMatrix * a_position; 
     }
 </script>
 <script type="x-shader/x-fragment" id="sfs">
@@ -24,16 +24,16 @@
     }
 </script>
 <script type="x-shader/x-vertex" id="vs">
-    attribute vec4 a_Position;
-    attribute vec4 a_Color;
+    attribute vec4 a_position;
+    attribute vec4 a_color;
     uniform mat4 u_MvpMatrix;
     uniform mat4 u_MvpMatrixFromLight;
     varying vec4 v_PositionFromLight;
-    varying vec4 v_Color;
+    varying vec4 v_color;
     void main() {
-        gl_Position = u_MvpMatrix * a_Position; 
-        v_PositionFromLight = u_MvpMatrixFromLight * a_Position;
-        v_Color = a_Color;
+        gl_Position = u_MvpMatrix * a_position; 
+        v_PositionFromLight = u_MvpMatrixFromLight * a_position;
+        v_color = a_color;
     }
 </script>
 <script type="x-shader/x-fragment" id="fs">
@@ -42,14 +42,14 @@
     #endif
     uniform sampler2D u_ShadowMap;
     varying vec4 v_PositionFromLight;
-    varying vec4 v_Color;
+    varying vec4 v_color;
     void main() {
         //获取对应的阴影坐标,这是gl_FragCoord的计算方式
         vec3 shadowCoord = (v_PositionFromLight.xyz/v_PositionFromLight.w)/2.0 + 0.5;
         //根据阴影xy坐标,获取纹理中对应的点,z值已经被之前的阴影着色器存放在该点的r分量中了,直接使用即可
         vec4 rgbaDepth = texture2D(u_ShadowMap, shadowCoord.xy);
         float visibility = (shadowCoord.z > rgbaDepth.r + 0.005) ? 0.7 : 1.0;
-        gl_FragColor = vec4(v_Color.rgb * visibility, v_Color.a);
+        gl_FragColor = vec4(v_color.rgb * visibility, v_color.a);
     }
 </script>
 <script>    
@@ -69,22 +69,14 @@ function main() {
     }
 
     // 初始化阴影着色器,创建对应program
-    var shadowShaders = getShaderString('svs', 'sfs');
-    if(!shadowShaders.length)return;
-    var shadowProgram=initProgram(gl,shadowShaders,
-        ['a_Position'],
-        ['u_MvpMatrix']);
+    var shadowProgram=createProgramInfo(gl,['svs','sfs']);
 
     // 初始化普通着色器,创建对应program
-    var normalShaders = getShaderString('vs', 'fs');
-    if(!normalShaders.length)return;
-    var normalProgram=initProgram(gl,normalShaders,
-        ['a_Position','a_Color',],
-        ['u_MvpMatrix','u_MvpMatrixFromLight','u_ShadowMap']);
+    var normalProgram=createProgramInfo(gl,['vs','fs']);
 
     // 获取对应图形的缓冲区对象
-    var triangleBuffers = initVertexBuffersForTriangle(gl);
-    var planeBuffers = initVertexBuffersForPlane(gl);
+    var triangleBuffers = initBuffersForTriangle(gl);
+    var planeBuffers = initBuffersForPlane(gl);
 
     // 初始化帧缓冲区对象 (FBO)  
     var fbo = initFramebufferObject(gl);
@@ -126,7 +118,7 @@ function main() {
         /*
             阴影着色器
          */ 
-        gl.useProgram(shadowProgram); // Set shaders for generating a shadow map
+        gl.useProgram(shadowProgram.program); // Set shaders for generating a shadow map
 
         // 三角形
         g_modelMatrix.setRotate(angle, 0, 1, 0);
@@ -146,16 +138,22 @@ function main() {
         /*
             正常的着色器
          */ 
-        gl.useProgram(normalProgram); // Set the shader for regular drawing
-        gl.uniform1i(normalProgram.u_ShadowMap, 0); // Pass 0 because gl.TEXTURE0 is enabled
-        
+        gl.useProgram(normalProgram.program); // Set the shader for regular drawing
+        setUniforms(normalProgram,{
+            u_ShadowMap: 0 // 传递0号纹理:gl.TEXTURE0
+        });
+
         // 三角形
-        gl.uniformMatrix4fv(normalProgram.u_MvpMatrixFromLight, false, mvpMatrixFromLight_t.elements);
+        setUniforms(normalProgram,{
+            u_MvpMatrixFromLight: mvpMatrixFromLight_t.elements
+        });
         g_modelMatrix.setRotate(angle, 0, 1, 0);
         draw(gl, normalProgram, triangleBuffers, viewProjMatrix);
         
         // 平面
-        gl.uniformMatrix4fv(normalProgram.u_MvpMatrixFromLight, false, mvpMatrixFromLight_p.elements);
+        setUniforms(normalProgram,{
+            u_MvpMatrixFromLight: mvpMatrixFromLight_p.elements
+        });
         g_modelMatrix.setRotate(-30, 0, 1, 1);
         draw(gl, normalProgram, planeBuffers, viewProjMatrix);
 
@@ -165,27 +163,19 @@ function main() {
 
 function draw(gl, program, buffer, viewProjMatrix) {
     // 输出attribute对应的数据缓冲
-    program.attr.forEach((item,i)=>{
-        if(item.name=='a_Position'){
-            buffer.outputVertex(item.loc);
-        }
-        if(item.name=='a_Color'){
-            buffer.outputColor(item.loc);
-        }
-    });
-
-    //输出顶点索引缓冲
-    buffer.outputIndex();
+    setBuffersAndAttributes(gl,program,buffer);
 
     // Calculate the model view project matrix and pass it to u_MvpMatrix
     g_mvpMatrix.set(viewProjMatrix);
     g_mvpMatrix.multiply(g_modelMatrix);
-    gl.uniformMatrix4fv(program.u_MvpMatrix, false, g_mvpMatrix.elements);
+    setUniforms(program,{
+        u_MvpMatrix: g_mvpMatrix.elements
+    });
 
-    gl.drawElements(gl.TRIANGLES, buffer.num, gl.UNSIGNED_BYTE, 0);
+    gl.drawElements(gl.TRIANGLES, buffer.numElements, buffer.indexType, 0);
 }
 
-function initVertexBuffersForPlane(gl) {
+function initBuffersForPlane(gl) {
     // Create a plane
     //  v1------v0
     //  |        | 
@@ -204,22 +194,14 @@ function initVertexBuffersForPlane(gl) {
     ]);
     // Indices of the vertices
     var indices = new Uint8Array([0, 1, 2, 0, 2, 3]);
-    return new VertexBuffers(gl,
-        {
-            data:vertices,
-            num:3,
-            type:gl.FLOAT
-        },{
-            data:colors,
-            num:3,
-            type:gl.FLOAT
-        },{
-            data:indices,
-            type:gl.UNSIGNED_BYTE
-        });
+    return createBufferInfoFromArrays(gl,{
+        position:vertices,
+        color:{data:colors,num:3},
+        indices:indices
+    });
 }
 
-function initVertexBuffersForTriangle(gl) {
+function initBuffersForTriangle(gl) {
     // Create a triangle
     //       v2
     //      / | 
@@ -233,19 +215,11 @@ function initVertexBuffersForTriangle(gl) {
     var colors = new Float32Array([1.0, 0.5, 0.0, 1.0, 0.5, 0.0, 1.0, 0.0, 0.0]);
     // Indices of the vertices
     var indices = new Uint8Array([0, 1, 2]);
-    return new VertexBuffers(gl,
-        {
-            data:vertices,
-            num:3,
-            type:gl.FLOAT
-        },{
-            data:colors,
-            num:3,
-            type:gl.FLOAT
-        },{
-            data:indices,
-            type:gl.UNSIGNED_BYTE
-        });
+    return createBufferInfoFromArrays(gl,{
+        position:vertices,
+        color:{data:colors,num:3},
+        indices:indices
+    });
 }
 
 main();

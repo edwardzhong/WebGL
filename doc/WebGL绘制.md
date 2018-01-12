@@ -1,5 +1,18 @@
 ## WebGL 绘制和变换
 
+    大多数程序在画布大小改变时都会保持canvas.width 和 canvas.height 与 canvas.clientWidth 和 canvas.clientHeight 一致，因为他们希望屏幕一像素对应绘制一像素。
+    但那并不是唯一的选择，也就是说在大多数情况下正确的做法是用canvas.clientHeight 和 canvas.clientWidth来计算长宽比
+
+0.“剔除”背面三角形
+    
+    WebGL可以只绘制正面或反面三角形，可以这样开启
+
+    gl.enable(gl.CULL_FACE);
+
+    WebGL中的三角形有正反面的概念，正面三角形的顶点顺序是顺时针方向， 反面三角形是逆时针方向。
+    将它放在 drawScene 方法里，开启这个特性后WebGL默认“剔除”背面三角形， "剔除"在这里是“不用绘制”的花哨叫法。
+    对于WebGL而言，一个三角形是顺时针还是逆时针是根据裁剪空间中的顶点顺序判断的， 换句话说，WebGL是根据你在顶点着色器中运算后提供的结果来判定的， 这就意味着如果你把一个顺时针的三角形沿 X 轴缩放 -1 ，它将会变成逆时针， 或者将顺时针的三角形旋转180度后变成逆时针。
+
 1.清空绘图区
 
     gl.clearColor(red, green, blue, alpha) 设置背景色。openGL的颜色取值返回是0-1。

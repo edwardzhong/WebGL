@@ -2,14 +2,15 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>点光源阴影立方体动画</title>
+<title>点光源阴影/聚光灯动画</title>
 <style>
     body{margin: 0;}
 </style>
 </head>
 <body>
-<canvas id="canvas" width="600" height="500"></canvas>
-<script src="../js/webgl.js"></script>
+<canvas id="canvas" width="600" height="450"></canvas>
+<script src="../js/webgl-util.js"></script>
+<script src="../js/util.js"></script>
 <script src="../js/matrix.js"></script>
 <script type="x-shader/x-vertex" id="svs">
     attribute vec4 a_position; 
@@ -22,7 +23,7 @@
     #ifdef GL_ES
         precision highp float;
     #endif
-    vec4 packDepth (float depth) {
+    vec4 pack (float depth) {
         // 使用rgba 4字节共32位来存储z值,1个字节精度为1/256
         const vec4 bitShift = vec4(1.0, 256.0, 256.0 * 256.0, 256.0 * 256.0 * 256.0);
         const vec4 bitMask = vec4(1.0/256.0, 1.0/256.0, 1.0/256.0, 0.0);
@@ -31,27 +32,34 @@
         rgbaDepth -= rgbaDepth.gbaa * bitMask; // Cut off the value which do not fit in 8 bits
         return rgbaDepth;
     }
+    // vec4 pack (float depth) {
+    //     const vec4 bitSh = vec4(256 * 256 * 256, 256 * 256, 256, 1.0);
+    //     const vec4 bitMsk = vec4(0, 1.0 / 256.0, 1.0 / 256.0, 1.0 / 256.0);
+    //     vec4 comp = fract(depth * bitSh);
+    //     comp -= comp.xxyz * bitMsk;
+    //     return comp;
+    // }
     //该片元着色器目的是计算每个片元的深度值z,并把z值保存到gl_FragColor中,可以把该纹理看成是深度值z的容器,因为它并不会渲染出来
     void main() {
-        gl_FragColor = packDepth(gl_FragCoord.z);// 将z值分开存储到rgba分量中,阴影颜色的同时也是深度值z
+        gl_FragColor = pack(gl_FragCoord.z);// 将z值分开存储到rgba分量中,阴影颜色的同时也是深度值z
     }
 </script>
 <script type="x-shader/x-vertex" id="vs">
     attribute vec4 a_position;
     attribute vec4 a_color;
-    attribute vec4 a_normals;
+    attribute vec4 a_normal;
     uniform mat4 u_modelMatrix;//等比例变换,可以用模型矩阵代替逆转置矩阵
     uniform mat4 u_mvpMatrix;//当前视点观测的模型视图投影矩阵
     uniform mat4 u_mvpMatrixFromLight;//光源处观察的模型视图投影矩阵
     varying vec4 v_positionFromLight;
     varying vec3 v_position;
-    varying vec3 v_normals;
+    varying vec3 v_normal;
     varying vec4 v_color;
     void main() {
         gl_Position = u_mvpMatrix * a_position; // 当前视点观察到的坐标
         v_positionFromLight = u_mvpMatrixFromLight * a_position;//光源处观察到的坐标,用于后续分解出z值
         v_position = vec3(u_modelMatrix * a_position);
-        v_normals = vec3(u_modelMatrix * a_normals);
+        v_normal = normalize(vec3(u_modelMatrix * a_normal));
         v_color = a_color;
     }
 </script>
@@ -67,22 +75,28 @@
 
     varying vec4 v_positionFromLight;
     varying vec3 v_position;
-    varying vec3 v_normals;
+    varying vec3 v_normal;
     varying vec4 v_color;
 
     /**
      * 释出深度值z
      */
-    float unpackDepth(const in vec4 rgbaDepth) {
+    float unpack(const in vec4 rgbaDepth) {
         const vec4 bitShift = vec4(1.0, 1.0/256.0, 1.0/(256.0*256.0), 1.0/(256.0*256.0*256.0));
         return dot(rgbaDepth, bitShift);
     }
+    // float unpack (vec4 colour) {
+    //     const vec4 bitShifts = vec4(1.0 / (256.0 * 256.0 * 256.0), 1.0 / (256.0 * 256.0), 1.0 / 256.0, 1.0);
+    //     return dot(colour, bitShifts);
+    // }
 
     void main() {
         // 对法线归一化，因为其内插之后长度不一定是1
-        vec3 normal = normalize(v_normals);
-        // 计算光线方向(点光源位置-顶点位置)并归一化
+        vec3 normal = normalize(v_normal);
+        // 计算光线方向
+        // 点光源(光源位置-顶点位置)并归一化
         vec3 lightDirection = normalize(u_lightPosition - v_position.xyz);
+        // 平行光源
         // vec3 lightDirection = normalize(u_lightPosition);
         // 计算光线方向和法向量点积(夹角的余弦值:90deg为与平面平行,0deg为与平面垂直)
         float cosTheta = max(dot(lightDirection, normal), 0.0);
@@ -95,42 +109,74 @@
         /**
          * 高光部分
          */
-        float shininess =50.0;
+        float shininess =10.0;
         vec3 specularColor =vec3(1.0,1.0,1.0);//镜面反射光颜色
-        vec3 eyeDirection = normalize(u_viewPosition-v_position.xyz);// 反射方向
+        vec3 viewDirection = normalize(u_viewPosition-v_position.xyz);// 反射方向
         // phong 冯氏模型 高光部分更加集中
         vec3 reflectionDirection = reflect(-lightDirection, normal);
-        float specularWeighting = pow(max(dot(reflectionDirection, eyeDirection), 0.0), shininess);
+        // float specularWeighting = pow(max(dot(reflectionDirection, viewDirection), 0.0), shininess);
 
         // Blinn-Phong 宾氏模型 高光过渡更加自然
-        vec3 halfwayDir = normalize(lightDirection + eyeDirection);
+        vec3 halfwayDir = normalize(lightDirection + viewDirection);
         // float specularWeighting = pow(max(dot(normal, halfwayDir), 0.0), shininess);
 
+        //聚光灯部分
+        //灯光照射方向是指向坐标原点(0,0,o),可指定照射角度(degX,degY)或者照射坐标
+        float limit=cos(radians(25.0));//角度余弦值
+        //outerLimit和innerLimit之间的光线模糊效果
+        float outerLimit=cos(radians(25.0));
+        float innerLimit=cos(radians(20.0));
+        float specularWeighting = 0.0;
+        vec3 spotLight= vec3(0.0,0.0,0.0);
+        vec3 lightPosition =normalize(u_lightPosition);
+        float dotFromDirection = dot(lightDirection,lightPosition);
+        float inLight = smoothstep(outerLimit, innerLimit, dotFromDirection);
+        if (dotFromDirection >= limit) {
+            // 漫反射
+            spotLight=u_lightColor * v_color.rgb * inLight * cosTheta;
+            // 高光
+            specularWeighting = pow(max(dot(normal, halfwayDir), 0.0), shininess);
+        }
+
         // 计算镜面高光亮度
-        vec3 specular =  specularColor.rgb * specularWeighting * (cosTheta<=0.0?0.0:1.0);
+        vec3 specular = specularColor.rgb * specularWeighting * step(cosTheta,0.0);
+        gl_FragColor = vec4((spotLight + ambient + specular), v_color.a);
+        // /**
+        //  * 阴影部分
+        //  */
+        // float bias = 0.005*tan(acos(cosTheta));
+        // bias = clamp(bias, 0.0015,0.005);
+        // // float bias = max(0.005 * (1.0 - dot(normal, lightDirection)), 0.0015);  
+        // // 因为阴影纹理坐标和该坐标(光源处观察到的坐标),视点都是在光源处(使用的都是光源处的mvp矩阵);
+        // // 所以使用该坐标计算出的就是纹理的坐标, 再通过纹理坐标就能找到光源处对应的z值
+        // // xy将坐标区间从[-1,1]转为gl_FragCoord的区间[0,1],z是求出gl_FragCoord的深度值z(与后面的纹理z比较),刚好它们的求值方式都是一样
+        // vec3 shadowCoord = (v_positionFromLight.xyz/v_positionFromLight.w)/2.0 + 0.5;
+        // // vec4 rgbaDepth = texture2D(u_shadowMap, shadowCoord.xy);// 获取指定纹理坐标处的像素颜色rgba
+        // // float depth = unpack(rgbaDepth); //将纹理颜色值(gl_fragColor)解析出阴影深度值z(光源视点)
+        // // float visibility = (shadowCoord.z > depth + bias) ? 0.6 : 1.0;//大于阴影的z轴,说明在阴影中并显示为阴影*0.6,否则为正常颜色*1.0
 
-        /**
-         * 阴影部分
-         */
-        float bias = 0.005*tan(acos(cosTheta));
-        bias = clamp(bias, 0.0,0.01);
-
-        // 因为阴影纹理坐标和该坐标(光源处观察到的坐标),视点都是在光源处(使用的都是光源处的mvp矩阵);
-        // 所以使用该坐标计算出的就是纹理的坐标, 再通过纹理坐标就能找到光源处对应的z值
-        // xy将坐标区间从[-1,1]转为gl_FragCoord的区间[0,1],z是求出gl_FragCoord的深度值z(与后面的纹理z比较),刚好它们的求值方式都是一样
-        vec3 shadowCoord = (v_positionFromLight.xyz/v_positionFromLight.w)/2.0 + 0.5;
-        vec4 rgbaDepth = texture2D(u_shadowMap, shadowCoord.xy);// 获取指定纹理坐标处的像素颜色rgba
-        float depth = unpackDepth(rgbaDepth); //将纹理颜色值(gl_fragColor)解析出阴影深度值z(光源视点)
-        float visibility = (shadowCoord.z > depth + 0.0015) ? 0.5 : 1.0;//大于阴影的z轴,说明在阴影中并显示为阴影*0.6,否则为正常颜色*1.0
-
-        // float bias = 0.005;
-        // float visibility = 1.0;
-        // if ( texture2D( shadowMap, ShadowCoord.xy ).z  <  ShadowCoord.z-bias){
-        //     visibility = 0.5;
+        // float visibility=1.0;
+        // float shadow =0.0;
+        // float opacity=0.6;
+        // float texelSize=1.0/2048.0;
+        // if (dotFromDirection >= limit) {
+        //     for(float y=-1.5; y <= 1.5; y += 1.0){
+        //         for(float x=-1.5; x <=1.5; x += 1.0){
+        //             vec4 rgbaDepth = texture2D(u_shadowMap, shadowCoord.xy+vec2(x,y)*texelSize);
+        //             shadow += shadowCoord.z-bias > unpack(rgbaDepth)?1.0:0.0;
+        //         }
+        //     }  
+        //     shadow/=16.0;
+        //     // visibility= shadow==1.0?0.7:1.0; 
+        //     if(shadow==1.0){
+        //         visibility=opacity;
+        //     } else {
+        //         // visibility=1.0-smoothstep(0.8,1.0,shadow);
+        //         float range=clamp(shadow,0.8,0.99999999);
+        //         visibility=range<=0.8?1.0:opacity+(1.0-shadow);
+        //     }
         // }
-
-        gl_FragColor = vec4((diffuse + ambient + specular) * visibility, v_color.a);
-
+        // gl_FragColor = vec4((spotLight + ambient + specular) * visibility, v_color.a);
     }
 </script>
 <script>
@@ -142,8 +188,15 @@ var canvas = document.getElementById('canvas'),
     gl = get3DContext(canvas),
     OFFSCREEN_WIDTH = 2048,
     OFFSCREEN_HEIGHT = 2048,
-    LIGHT_POS=[4,3,9],//光源位置
-    VIEW_POS=[0,2,12];//视点位置
+    viewAngleX=0,
+    viewAngleY=30,
+    cViewAngleX=0,
+    cViewAngleY=0,
+    viewLEN=12,
+    lenPercent=1,
+    friction = 0.98,
+    LIGHT_POS=[2,2,6],//光源位置
+    VIEW_POS=[-2,6,8];//视点位置
 
 function main() {
     if (!gl) {
@@ -152,15 +205,14 @@ function main() {
     }
 
     // 初始化阴影着色器,创建对应program
-    var shadowProgram=createProgramInfo(gl,['svs','sfs'],['a_position']);
+    var shadowProgram=createProgramInfo(gl,['svs','sfs']);
 
     // 初始化普通着色器,创建对应program
-    var normalProgram=createProgramInfo(gl,['vs','fs'],['a_position','a_color','a_normals']);
+    var normalProgram=createProgramInfo(gl,['vs','fs']);
 
     // 获取对应图形的缓冲区对象
     var planeBuffers = initBuffersForPlane(gl);
     var cubeBuffers = initBuffersForCube(gl);
-    var sphereBuffers = initBuffersForSphere(gl);
 
     // 初始化帧缓冲区对象 (FBO)  
     var fbo = initFramebufferObject(gl);
@@ -184,16 +236,13 @@ function main() {
     viewProjMatrixFromLight.lookAt(...LIGHT_POS, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0);
 
     var viewProjMatrix = new Matrix4(); // 当前视点观测的视图投影矩阵(正常着色器)
-    viewProjMatrix.setPerspective(35, canvas.width / canvas.height, 1.0, 100.0);
-    viewProjMatrix.lookAt(...VIEW_POS, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0);
-
     var mvpMatrixFromLight_s = new Matrix4(); // 从光源处观察圆球的mvp矩阵(正常着色器)
     var mvpMatrixFromLight_c = new Matrix4(); // 从光源处观察立方体的mvp矩阵(正常着色器)
     var mvpMatrixFromLight_p = new Matrix4(); // 从光源处观察平面的mvp矩阵(正常着色器)
     var mvpMatrix = new Matrix4();// 通用mvp矩阵
     var modelMatrix = new Matrix4();// 模型矩阵(正常着色器)
 
-    var angle=45,ANGLE_STEP = 40, last = Date.now();
+    var angle=29,ANGLE_STEP = 40, last = Date.now();
     (function animate(){
         var now = new Date(),
             elapsed = now - last;
@@ -202,6 +251,19 @@ function main() {
         angle += ANGLE_STEP * elapsed / 1000;
         angle %= 360;
 
+        var angleX=(viewAngleX+cViewAngleX)%360;
+            angleY=viewAngleY+cViewAngleY,
+            len=viewLEN*lenPercent;
+        angleY=angleY>90?90:angleY<10?10:angleY;
+        len=len>30?30:len<6?6:len;
+
+        var eyeY=len*Math.sin(angleY*Math.PI/180),
+            c=len*Math.cos(angleY*Math.PI/180),
+            eyeX=c*Math.sin(angleX*Math.PI/180),
+            eyeZ=c*Math.cos(angleX*Math.PI/180);
+
+        viewProjMatrix.setPerspective(35, canvas.width / canvas.height, 1.0, 100.0);
+        viewProjMatrix.lookAt(eyeX,eyeY,eyeZ, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0);
         gl.bindFramebuffer(gl.FRAMEBUFFER, fbo); // 切换绘制场景为帧缓冲区  
         gl.viewport(0, 0, OFFSCREEN_HEIGHT, OFFSCREEN_HEIGHT); // 设置帧绘图区域
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT); // Clear FBO    
@@ -211,16 +273,14 @@ function main() {
         gl.useProgram(shadowProgram.program);
         
         // gl.enable(gl.CULL_FACE);
-        // gl.cullFace(gl.BACK);
+        // gl.cullFace(gl.FRONT);
         // 绘制立方体
         drawCube(shadowProgram,viewProjMatrixFromLight);
-        // 圆球
-        drawSphere(shadowProgram,viewProjMatrixFromLight);
-        // gl.cullFace(gl.FRONT);
+        // gl.cullFace(gl.BACK);
+        // gl.disable(gl.CULL_FACE);
+                
         // 绘制平面
         drawPlane(shadowProgram,viewProjMatrixFromLight);
-        // gl.disable(gl.CULL_FACE);
-
         
         // 将帧缓冲区切换为正常的缓冲区
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
@@ -232,38 +292,22 @@ function main() {
          *  正常的着色器
          */ 
         gl.useProgram(normalProgram.program);
-        normalProgram.setUniforms({
-            u_shadowMap: '0', // 传递0号纹理:gl.TEXTURE0
+
+        setUniforms(normalProgram,{
+            u_shadowMap: 0, // 传递0号纹理:gl.TEXTURE0
             u_lightColor: [1,1,1],// 光照颜色
             u_lightPosition: LIGHT_POS, // 光线方向(世界坐标系下)
             u_ambientColor:[0.2,0.2,0.2], // 环境光颜色
-            u_viewPosition:VIEW_POS
+            u_viewPosition:[eyeX,eyeY,eyeZ]
         });
         
         // 绘制立方体        
         drawCube(normalProgram,viewProjMatrix);
-        drawSphere(normalProgram,viewProjMatrix);
         // 绘制平面
         drawPlane(normalProgram,viewProjMatrix);
         
         requestAnimationFrame(animate);
     }());
-
-    function drawSphere(program,vpMatrix){
-        modelMatrix.setTranslate( -1, 2.5, 2.0);
-        modelMatrix.rotate(0, 0, 1, 0);
-        mvpMatrix.set(vpMatrix);
-        mvpMatrix.multiply(modelMatrix);
-        if(program==shadowProgram){
-            mvpMatrixFromLight_s.set(mvpMatrix);
-        } else {
-            program.setUniforms({
-                u_mvpMatrixFromLight: mvpMatrixFromLight_s.elements,
-                u_modelMatrix: modelMatrix.elements
-            });
-        }
-        draw(gl, program, sphereBuffers,mvpMatrix);
-    }
 
     function drawCube(program,vpMatrix){
         modelMatrix.setTranslate( 1.5, 0, 2.5);
@@ -273,7 +317,7 @@ function main() {
         if(program==shadowProgram){
             mvpMatrixFromLight_c.set(mvpMatrix);
         } else {
-            program.setUniforms({
+            setUniforms(program,{
                 u_mvpMatrixFromLight: mvpMatrixFromLight_c.elements,
                 u_modelMatrix: modelMatrix.elements
             });
@@ -289,7 +333,7 @@ function main() {
         if(program==shadowProgram){
             mvpMatrixFromLight_p.set(mvpMatrix);
         } else {
-            program.setUniforms({
+            setUniforms(program,{
                 u_mvpMatrixFromLight: mvpMatrixFromLight_p.elements,
                 u_modelMatrix: modelMatrix.elements
             });
@@ -301,62 +345,9 @@ function main() {
 
 function draw(gl, program, buffer,mvpMatrix) {
     // 输出attribute对应的数据缓冲
-    program.setBufferAttributes(buffer);
-    program.setUniforms({u_mvpMatrix: mvpMatrix.elements});
-    //输出顶点索引缓冲
-    buffer.outputIndex();
-    gl.drawElements(gl.TRIANGLES, buffer.num, gl.UNSIGNED_BYTE, 0);
-}
-
-function initBuffersForSphere(gl) { // Create a sphere
-    var SPHERE_DIV = 15;
-
-    var i, ai, si, ci;
-    var j, aj, sj, cj;
-    var p1, p2;
-
-    var positions = [];
-    var colors = [];
-    var indices = [];
-
-      // 创建顶点坐标
-    for (j = 0; j <= SPHERE_DIV; j++) {
-        aj = j * Math.PI / SPHERE_DIV;
-        sj = Math.sin(aj);
-        cj = Math.cos(aj);
-        for (i = 0; i <= SPHERE_DIV; i++) {
-          ai = i * 2 * Math.PI / SPHERE_DIV;
-          si = Math.sin(ai);
-          ci = Math.cos(ai);
-
-          positions.push(si * sj);  // X
-          positions.push(cj);       // Y
-          positions.push(ci * sj);  // Z
-          colors.push(0,0.5,1);
-        }
-    }
-
-      // 创建顶点索引
-    for (j = 0; j < SPHERE_DIV; j++) {
-        for (i = 0; i < SPHERE_DIV; i++) {
-          p1 = j * (SPHERE_DIV+1) + i;
-          p2 = p1 + (SPHERE_DIV+1);
-
-          indices.push(p1);
-          indices.push(p2);
-          indices.push(p1 + 1);
-
-          indices.push(p1 + 1);
-          indices.push(p2);
-          indices.push(p2 + 1);
-        }
-    }
-    return createBuffer(gl,{
-        position:{data:new Float32Array(positions), num:3, type:gl.FLOAT },
-        color:{data:new Float32Array(colors), num:3, type:gl.FLOAT },
-        normals:{data:new Float32Array(positions), num:3, type:gl.FLOAT },
-        indices:{data:new Uint8Array(indices), type:gl.UNSIGNED_BYTE }
-    });
+    setBuffersAndAttributes(gl,program,buffer);
+    setUniforms(program,{u_mvpMatrix: mvpMatrix.elements});
+    gl.drawElements(gl.TRIANGLES, buffer.numElements, buffer.indexType, 0);
 }
 
 function initBuffersForCube(gl) {
@@ -370,34 +361,34 @@ function initBuffersForCube(gl) {
     //  v2------v3
     //
     // 顶点
-    var vertices = new Float32Array([
+    var vertices = [
          1.0,3.0, 1.0,  -1.0, 3.0, 1.0,  -1.0, 1.0, 1.0,   1.0, 1.0, 1.0, // v0-v1-v2-v3 front
          1.0,3.0, 1.0,   1.0, 1.0, 1.0,   1.0, 1.0,-1.0,   1.0, 3.0,-1.0, // v0-v3-v4-v5 right
          1.0,3.0, 1.0,   1.0, 3.0,-1.0,  -1.0, 3.0,-1.0,  -1.0, 3.0, 1.0, // v0-v5-v6-v1 up
         -1.0,3.0, 1.0,  -1.0, 3.0,-1.0,  -1.0, 1.0,-1.0,  -1.0, 1.0, 1.0, // v1-v6-v7-v2 left
         -1.0,1.0,-1.0,   1.0, 1.0,-1.0,   1.0, 1.0, 1.0,  -1.0, 1.0, 1.0, // v7-v4-v3-v2 down
          1.0,1.0,-1.0,  -1.0, 1.0,-1.0,  -1.0, 3.0,-1.0,   1.0, 3.0,-1.0  // v4-v7-v6-v5 back
-    ]);
+    ];
 
     // 颜色
-    var colors = new Float32Array([
+    var colors = [
         0.7, 0, 0,   0.7, 0, 0,   0.7, 0, 0,  0.7, 0, 0,     // v0-v1-v2-v3 front
         0.7, 0, 0,   0.7, 0, 0,   0.7, 0, 0,  0.7, 0, 0,     // v0-v3-v4-v5 right
         0.7, 0, 0,   0.7, 0, 0,   0.7, 0, 0,  0.7, 0, 0,     // v0-v5-v6-v1 up
         0.7, 0, 0,   0.7, 0, 0,   0.7, 0, 0,  0.7, 0, 0,     // v1-v6-v7-v2 left
         0.7, 0, 0,   0.7, 0, 0,   0.7, 0, 0,  0.7, 0, 0,     // v7-v4-v3-v2 down
         0.7, 0, 0,   0.7, 0, 0,   0.7, 0, 0,  0.7, 0, 0　    // v4-v7-v6-v5 back
-    ]);
+    ];
 
     // 法向量
-    var normals = new Float32Array([
+    var normals = [
         0.0, 0.0, 1.0,   0.0, 0.0, 1.0,   0.0, 0.0, 1.0,   0.0, 0.0, 1.0,  // v0-v1-v2-v3 front
         1.0, 0.0, 0.0,   1.0, 0.0, 0.0,   1.0, 0.0, 0.0,   1.0, 0.0, 0.0,  // v0-v3-v4-v5 right
         0.0, 1.0, 0.0,   0.0, 1.0, 0.0,   0.0, 1.0, 0.0,   0.0, 1.0, 0.0,  // v0-v5-v6-v1 up
         -1.0, 0.0, 0.0,  -1.0, 0.0, 0.0,  -1.0, 0.0, 0.0,  -1.0, 0.0, 0.0,  // v1-v6-v7-v2 left
         0.0,-1.0, 0.0,   0.0,-1.0, 0.0,   0.0,-1.0, 0.0,   0.0,-1.0, 0.0,  // v7-v4-v3-v2 down
         0.0, 0.0,-1.0,   0.0, 0.0,-1.0,   0.0, 0.0,-1.0,   0.0, 0.0,-1.0   // v4-v7-v6-v5 back
-    ]);
+    ];
 
     // 顶点索引
     var indices = new Uint8Array([
@@ -408,11 +399,11 @@ function initBuffersForCube(gl) {
         16,17,18,  16,18,19,    // down
         20,21,22,  20,22,23     // back
     ]);
-    return createBuffer(gl,{
-        position:{data:vertices, num:3, type:gl.FLOAT },
-        color:{data:colors, num:3, type:gl.FLOAT },
-        normals:{data:normals, num:3, type:gl.FLOAT },
-        indices:{data:indices, type:gl.UNSIGNED_BYTE }
+    return createBufferInfoFromArrays(gl,{
+        position:{data:vertices,num:3},
+        color:{data:colors,num:3},
+        normal:{data:normals,num:3},
+        indices:indices
     });
 }
 
@@ -424,26 +415,69 @@ function initBuffersForPlane(gl) {
     //  |        |
     //  v1------v0
     //
-    // 顶点
-    var vertices = new Float32Array([
-        4.0, -1, 4.0, 
-        -5.0,-1, 4.0, 
-        -5.0,-1, -10.0, 
-        4.0, -1, -10.0 // v0-v1-v2-v3
-    ]);
+    // 顶点 v0-v1-v2-v3
+    var vertices = [
+        10.0, -1, 5.0, 
+        -10.0,-1, 5.0, 
+        -10.0,-1, -10.0, 
+        10.0, -1, -10.0
+    ];
+    var normal=[
+        0,1,0,
+        0,1,0,
+        0,1,0,
+        0,1,0
+    ];
     // 颜色
-    var colors = new Float32Array([
-        1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0
-    ]);
+    var colors = [
+        1, 1, 1, 
+        1, 1, 1, 
+        1, 1, 1, 
+        1, 1, 1
+    ];
     // 顶点索引
     var indices = new Uint8Array([0, 1, 2, 0, 2, 3]);
-    return createBuffer(gl,{
-        position:{data:vertices, num:3, type:gl.FLOAT },
-        color:{data:colors, num:3, type:gl.FLOAT },
-        indices:{data:indices, type:gl.UNSIGNED_BYTE }
+
+    return createBufferInfoFromArrays(gl,{
+        position:vertices,
+        normal:normal,
+        color:{data:colors,num:3},
+        indices:indices
     });
 }
 
+var center={x:canvas.width/2,y:canvas.height/2};
+var start={};
+document.addEventListener('mousedown',function(e){
+    start = WindowToCanvas(canvas,e.clientX,e.clientY);
+    document.addEventListener('mousemove',mouseMove,false);
+    document.addEventListener('mouseup',mouseUp,false);
+},false);
+
+function mouseMove(e){
+    var end = WindowToCanvas(canvas,e.clientX,e.clientY),
+        a=Math.sqrt(Math.pow(start.x-center.x,2)+Math.pow(start.y-center.y,2)),
+        b=Math.sqrt(Math.pow(end.x-center.x,2)+Math.pow(end.y-center.y,2)),
+        radX=(start.x-end.x) * 0.01,
+        radY=(end.y-start.y)*0.01;
+
+    cViewAngleX=radX*180/Math.PI;
+    cViewAngleY=radY*180/Math.PI;
+    cViewAngleY>90?90:cViewAngleY<-90?-90:cViewAngleY;
+    lenPercent=1;
+    // lenPercent=b/a;
+}
+
+function mouseUp(e){
+    viewAngleX+=cViewAngleX;
+    cViewAngleX=0;
+    viewAngleY+=cViewAngleY;
+    cViewAngleY=0;
+    viewLEN*=lenPercent;
+    lenPercent=1;
+    document.removeEventListener('mouseup',arguments.callee,false);
+    document.removeEventListener('mousemove',mouseMove,false);
+}
 main();
 </script>
 </body>
