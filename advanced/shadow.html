@@ -44,11 +44,13 @@
     varying vec4 v_PositionFromLight;
     varying vec4 v_color;
     void main() {
-        //获取对应的阴影坐标,这是gl_FragCoord的计算方式
+        // 因为阴影纹理坐标和该坐标(光源处观察到的坐标),视点都是在光源处(使用的都是光源处的mvp矩阵);
+        // 所以使用该坐标计算出的就是纹理的坐标, 再通过纹理坐标就能找到光源处对应的z值
+        // xy将坐标区间从[-1,1]转为gl_FragCoord的区间[0,1],z是求出gl_FragCoord的深度值z(与后面的纹理z比较),刚好它们的求值方式都是一样
         vec3 shadowCoord = (v_PositionFromLight.xyz/v_PositionFromLight.w)/2.0 + 0.5;
         //根据阴影xy坐标,获取纹理中对应的点,z值已经被之前的阴影着色器存放在该点的r分量中了,直接使用即可
-        vec4 rgbaDepth = texture2D(u_ShadowMap, shadowCoord.xy);
-        float visibility = (shadowCoord.z > rgbaDepth.r + 0.005) ? 0.7 : 1.0;
+        vec4 rgbaDepth = texture2D(u_ShadowMap, shadowCoord.xy);// 获取指定纹理坐标处的像素颜色rgba
+        float visibility = (shadowCoord.z > rgbaDepth.r + 0.005) ? 0.6 : 1.0;//大于阴影的z轴,说明在阴影中并显示为阴影*0.6,否则为正常颜色*1.0
         gl_FragColor = vec4(v_color.rgb * visibility, v_color.a);
     }
 </script>
@@ -57,7 +59,7 @@ var canvas = document.getElementById('canvas'),
     gl = get3DContext(canvas),
     OFFSCREEN_WIDTH = 2048,
     OFFSCREEN_HEIGHT = 2048,
-    LIGHT_POS=[0,7,2],
+    LIGHT_POS=[0,7,3],
     VIEW_POS=[0,7,9],
     g_modelMatrix = new Matrix4(),
     g_mvpMatrix = new Matrix4();

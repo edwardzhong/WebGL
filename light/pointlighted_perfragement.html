@@ -58,7 +58,7 @@
     // 镜面反射亮度权重
     float specularLightWeighting = pow(max(dot(reflectionDirection, eyeDirection), 0.0), shininess);
     // 镜面高光亮度
-    vec3 specular =  specularColor.rgb * specularLightWeighting * (nDotL<=0.0?0.0:1.0);
+    vec3 specular =  specularColor.rgb * specularLightWeighting;
     gl_FragColor = vec4(ambient + diffuse + specular, v_Color.a);
   }
 </script>
@@ -77,7 +77,7 @@
 			return;
 		}
 
-		var n=initVertexBuffers();
+		var n=initVertexBuffers(gl);
 		if(n<0){
 			console.log('Failed to set the vertex information');
 			return;
@@ -137,7 +137,7 @@
 		// gl.drawArrays(gl.TRIANGLES, 0, 9);
 	}
 
-	function initVertexBuffers() { // Create a sphere
+	function initVertexBuffers(gl) { // Create a sphere
 	  var SPHERE_DIV = 18;
 
 	  var i, ai, si, ci;
@@ -178,70 +178,17 @@
 	      indices.push(p2 + 1);
 	    }
 	  }
+	  	var a_Position = gl.getAttribLocation(gl.program, 'a_Position');
+	    var a_Normal = gl.getAttribLocation(gl.program, 'a_Normal');
+	    if (a_Position < 0 || a_Normal < 0) {
+	        console.log('Failed to get the storage attribute location ');
+	        return 0;
+	    }
 
-		// 创建顶点缓冲
-		if(!initArrayBuffer('a_Position',new Float32Array(positions),3,gl.FLOAT)){
-			return -1;
-		}
-
-		if (!initArrayBuffer('a_Normal', new Float32Array(positions), 3, gl.FLOAT)) {
-			return -1;
-		}
-		  // Unbind the buffer object
-		  // gl.bindBuffer(gl.ARRAY_BUFFER, null);
-
-
-		//创建顶点索引缓冲
-		if(!createBuffer(new Uint16Array(indices),gl.ELEMENT_ARRAY_BUFFER)){
-		    console.log('Failed to create the buffer object');
-		    return -1;
-		}
-
+		initBuffer(gl,{data:new Float32Array(positions), num:3, type:gl.FLOAT },a_Position);
+		initBuffer(gl,{data:new Float32Array(positions), num:3, type:gl.FLOAT },a_Normal);
+		initElementBuffer(gl,new Uint16Array(indices));
 		return indices.length;
-	}
-
-	/**
-	* 创建缓冲区
-	* @param  {Array} data
-	* @param  {Object} bufferType
-	* @return {Object}     
-	*/
-	function createBuffer(data,bufferType){  
-		// 生成缓存对象  
-		var buffer = gl.createBuffer();  
-		if (!buffer) {
-			console.log('Failed to create the buffer object');
-			return null;
-		}
-		// 绑定缓存(gl.ARRAY_BUFFER<顶点>||gl.ELEMENT_ARRAY_BUFFER<顶点索引>) 
-		gl.bindBuffer(bufferType||gl.ARRAY_BUFFER, buffer);  
-
-		// 向缓存中写入数据  
-		gl.bufferData(bufferType||gl.ARRAY_BUFFER, data, gl.STATIC_DRAW);  
-
-		// 将绑定的缓存设为无效  
-		// gl.bindBuffer(gl.ARRAY_BUFFER, null);  
-
-		// 返回生成的buffer  
-		return buffer;
-	} 
-
-	function initArrayBuffer(attribute,data,num,type){
-  		// 创建顶点缓冲
-		if(!createBuffer(data)){
-		    console.log('Failed to create the buffer object');
-		    return false;
-		}
-
-		var a_attribute = gl.getAttribLocation(gl.program, attribute);
-		if (a_attribute < 0) {
-			console.log('Failed to get the storage location of ' + attribute);
-			return false;
-		}
-		// (地址,每个顶点分量的个数<1-4>,数据类型<整形，符点等>,是否归一化,指定相邻两个顶点间字节数<默认0>,指定缓冲区对象偏移字节数量<默认0>)
-		gl.vertexAttribPointer(a_attribute, num, type, false, 0, 0);
-		gl.enableVertexAttribArray(a_attribute);
-		return true;		
 	}
 
 	main();

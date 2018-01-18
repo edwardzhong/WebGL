@@ -12,7 +12,7 @@
 	/**
 	 * 平面(2*0*2)
 	 */
-	function plane(color){
+	function Plane(color){
 		//  v0------v1
 	    //  |        | 
 	    //  |        |
@@ -20,14 +20,19 @@
 	    //  v3------v2
 		color=color||[1,1,1,1];
 		var positions = [-1,0,-1,  1,0,-1,  1,0,1,  -1,0,1],
-	        normals = [0,1,0,0,1,0,0,1,0,0,1,0],
-	        colors = color,
-	        indices = [1,3,0,1,2,3];
+	        normals = [0,1,0, 0,1,0, 0,1,0, 0,1,0],
+	        colors = [],
+	        indices = new Uint8Array([0,2,3,0,1,2]);
+	    for(var i=0;i<4;i++){
+	    	colors=colors.concat(color);
+	    }
 
 	    return new Polygon(positions,normals,colors,indices);
 	}
 
-
+	/**
+	 * 立方体(1*1*1)
+	 */
 	function Cube(color){
 	    //    v4----- v7
 	    //   /|      /|
@@ -45,12 +50,12 @@
 
 	    // 顶点
 	    var positions = [
-	         -0.5, 0.5, 0.5,   0.5, 0.5, 0.5,   0.5, -0.5, 0.5,  -0.5, -0.5, 0.5, // v0-v1-v2-v3 front
-	         0.5, 0.5, 0.5,    0.5, 0.5, -0.5,  0.5, -0.5,-0.5,  0.5, -0.5, 0.5, // v1-v7-v6-v2 right
-	         -0.5,0.5, -0.5,   0.5, 0.5, -0.5,  0.5, 0.5, 0.5,   -0.5, 0.5, 0.5, // v4-v7-v1-v0 up
-	         -0.5, 0.5, 0.5,   -0.5,0.5, -0.5,  -0.5,-0.5,-0.5,  -0.5, -0.5, 0.5, // v0-v4-v5-v3 left
-             -0.5,-0.5,-0.5,  -0.5, -0.5, 0.5,  0.5, -0.5, 0.5,  0.5, -0.5,-0.5, // v5-v3-v2-v6 down
-	         -0.5,0.5, -0.5,  -0.5,-0.5,-0.5,   0.5, -0.5,-0.5,  0.5, 0.5, -0.5  // v4-v5-v6-v7 back
+	         -1, 1, 1,   1, 1, 1,   1, -1, 1,  -1, -1, 1, // v0-v1-v2-v3 front
+	         1, 1, 1,    1, 1, -1,  1, -1,-1,  1, -1, 1, // v1-v7-v6-v2 right
+	         -1,1, -1,   1, 1, -1,  1, 1, 1,   -1, 1, 1, // v4-v7-v1-v0 up
+	         -1, 1, 1,   -1,1, -1,  -1,-1,-1,  -1, -1, 1, // v0-v4-v5-v3 left
+             -1,-1,-1,  -1, -1, 1,  1, -1, 1,  1, -1,-1, // v5-v3-v2-v6 down
+	         -1,1, -1,  -1,-1,-1,   1, -1,-1,  1, 1, -1  // v4-v5-v6-v7 back
 	    ];
 
 	    // 法向量
@@ -131,8 +136,121 @@
 	    return new Polygon(positions,normals,colors,indices);
 	}
 
-	function cylinder(){
+	/**
+	 * 圆柱体
+	 */
+	function Cylinder(r,h,l,color){
+		// 8
 
+		// 1 5
+		// 0 4
+
+		// 2 6
+		// 3 7
+
+		// 9
+		var angle=Math.PI*2/l,
+			x=0, z=0,
+			color=color||[1,1,1,1],
+			colors=[],
+			positions=[],
+			normals=[],
+			indices=[];
+
+		for(var i=0;i<l;i++){
+			x=Math.cos(angle*i);
+			z=Math.sin(angle*i);
+			
+			pushVertex([x,h/2,z],normalize([x,h/2,z]));
+			pushVertex([x,h/2,z],[0,1,0]);
+			pushVertex([x,-h/2,z],normalize([x,-h/2,z]));
+			pushVertex([x,-h/2,z],[0,-1,0]);
+
+			if(i%2){
+				pushVertex([0,h/2,0],[0,1,0]);
+				pushVertex([0,-h/2,0],[0,-1,0]);
+			}
+		}
+
+		for(var i=0,len=positions.length/3;i<len;i+=10){
+			indices.push(i+8,i+1,i+5);
+			indices.push(i+9,i+3,i+7);
+			indices.push(i,i+2,i+6);
+			indices.push(i,i+6,i+4);
+
+			if(i<len-10){
+				indices.push(i+8,i+5,i+10+1);
+				indices.push(i+9,i+7,i+10+3);
+				indices.push(i+4,i+10+2,i+6);
+				indices.push(i+4,i+10,i+10+2);
+			} else {
+				indices.push(i+8,i+5,1);
+				indices.push(i+9,i+7,3);
+				indices.push(i+4,2,i+6);
+				indices.push(i+4,0,2);
+			}
+		}
+
+		function pushVertex(pos,nor){
+			positions.push(...pos);
+			normals.push(...nor);
+			colors.push(...color);
+		}
+
+		return new Polygon(positions,normals,colors,new Uint8Array(indices));
+	}
+
+	/**
+	 * 圆锥体
+	 */
+	function Cone(r,h,l,color){
+		var angle=Math.PI*2/l,
+			x=0, z=0, pos,theTa,normal,
+			color=color||[1,1,1,1],
+			colors=[],
+			positions=[],
+			normals=[],
+			indices=[];
+
+		for(var i=0;i<l;i++){
+			x=r*Math.cos(angle*i);
+			z=r*Math.sin(angle*i);
+			pos=[x,-h/2,z];
+			theTa=Math.atan2(r,h);
+			normal=[x,r*Math.cos(theTa)*Math.sin(theTa),z];
+
+			positions.push(...pos);
+			positions.push(...pos);
+
+			normals.push(...normalize(normal));
+			normals.push(0,-1,0);
+
+			colors.push(...color);
+			colors.push(...color);
+
+			if(i%2){
+				positions.push(0,h/2,0);
+				positions.push(0,-h/2,0);
+				normals.push(0,1,0);
+				normals.push(0,-1,0);
+				colors.push(...color);
+				colors.push(...color);	
+			}
+		}
+				
+		for(var i=0,l=positions.length/3;i<l;i+=6){
+			indices.push(i+4,i,i+2);
+			indices.push(i+5,i+1,i+3);
+			if(i<l-6){
+				indices.push(i+4,i+2,i+6);
+				indices.push(i+5,i+3,i+6+1);
+			} else {
+				indices.push(i+4,i+2,0);
+				indices.push(i+5,i+3,1);
+			}
+		}
+
+		return new Polygon(positions,normals,colors,new Uint8Array(indices));
 	}
 	
     function normalize(v) {
@@ -153,3 +271,7 @@
         v[2] = e * g;
         return v;
     }
+
+
+
+

@@ -47,18 +47,7 @@
     // 计算光照颜色
     vec3 diffuse = u_LightColor * v_Color.rgb * nDotL;
     vec3 ambient = u_AmbientLight * v_Color.rgb;
-    // gl_FragColor = vec4(diffuse + ambient, v_Color.a);
-    
-    // 观察方向的单位向量V
-    // vec3 eyeDirection = normalize(-v_Position.xyz);// 反射方向
-    vec3 eyeDirection = vec3(0.0,0.1,1.0);
-    vec3 reflectionDirection = reflect(-lightDirection, normal);
-    vec3 specularColor =vec3(1.0,1.0,1.0);//镜面反射光颜色
-    // 镜面反射亮度权重
-    float specularWeighting = pow(max(dot(reflectionDirection, eyeDirection), 0.0), 100.0);
-    // 镜面高光亮度
-    vec3 specular =  specularColor.rgb * specularWeighting * (nDotL<=0.0?0.0:1.0);
-    gl_FragColor = vec4(ambient + diffuse + specular, 1.0);
+    gl_FragColor = vec4(diffuse + ambient, v_Color.a);
   }
 </script>
 <script>
@@ -76,14 +65,8 @@
 			return;
 		}
 
-    	var a_Position = gl.getAttribLocation(gl.program, 'a_Position');
-	    var a_Color = gl.getAttribLocation(gl.program, 'a_Color');
-	    var a_Normal = gl.getAttribLocation(gl.program, 'a_Normal');
-	    if (a_Position < 0 || a_Color < 0 || a_Normal < 0) {
-	        console.log('Failed to get the storage attribute location ');
-	        return;
-	    }
-
+		var n=initVertexBuffers(gl);
+		if(!n)return;
     	// 获取变量地址
 		var u_ModelMatrix = gl.getUniformLocation(gl.program, 'u_ModelMatrix');
 		var u_MvpMatrix = gl.getUniformLocation(gl.program, 'u_MvpMatrix');
@@ -95,12 +78,6 @@
 			console.log('Failed to get the storage location');
 			return;
 		}
-
-		var buffers=initVertexBuffers(gl);
-		buffers.outputPosition(a_Position);
-		buffers.outputColor(a_Color);
-		buffers.outputNormals(a_Normal);
-		buffers.outputIndex();
 		
 		// 设置背景颜色
 		gl.clearColor(0.0, 0.0, 0.0, 1.0);
@@ -140,7 +117,7 @@
 			gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
 			// 根据顶点索引绘制图形(图形类型，绘制顶点个数，顶点索引数据类型，顶点索引中开始绘制的位置)
-			gl.drawElements(gl.TRIANGLES, buffers.num, gl.UNSIGNED_BYTE, 0);
+			gl.drawElements(gl.TRIANGLES, n, gl.UNSIGNED_BYTE, 0);
 
 			// gl.drawArrays(gl.TRIANGLES, 0, 9);
 			requestAnimationFrame(animate);
@@ -196,27 +173,19 @@
 			20,21,22,  20,22,23     // back
 		]);
 
-		return createBuffer(gl,{
-        	position:{
-	            data:vertices,
-	            num:3,
-	            type:gl.FLOAT
-	        },
-	        color:{
-	            data:colors,
-	            num:3,
-	            type:gl.FLOAT
-	        },
-	        indices:{
-	            data:indices,
-	            type:gl.UNSIGNED_BYTE
-	        },
-	        normals:{
-	            data:normals,
-	            num:3,
-	            type:gl.FLOAT
-	        }
-	    });
+		var a_Position = gl.getAttribLocation(gl.program, 'a_Position');
+	    var a_Color = gl.getAttribLocation(gl.program, 'a_Color');
+	    var a_Normal = gl.getAttribLocation(gl.program, 'a_Normal');
+	    if (a_Position < 0 || a_Color < 0 || a_Normal < 0) {
+	        console.log('Failed to get the storage attribute location ');
+	        return 0;
+	    }
+
+		initBuffer(gl,{data:vertices, num:3, type:gl.FLOAT },a_Position);
+		initBuffer(gl,{data:colors, num:3, type:gl.FLOAT },a_Color);
+		initBuffer(gl,{data:normals, num:3, type:gl.FLOAT },a_Normal);
+		initElementBuffer(gl,indices);
+		return indices.length;
 	}
 
 	main();
