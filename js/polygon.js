@@ -158,8 +158,8 @@
 			indices=[];
 
 		for(var i=0;i<l;i++){
-			x=Math.cos(angle*i);
-			z=Math.sin(angle*i);
+			x=r*Math.cos(angle*i);
+			z=r*Math.sin(angle*i);
 			
 			pushVertex([x,h/2,z],normalize([x,h/2,z]));
 			pushVertex([x,h/2,z],[0,1,0]);
@@ -251,6 +251,10 @@
 		}
 
 		return new Polygon(positions,normals,colors,new Uint8Array(indices));
+	}
+	
+	function Torus(ra,rb,l,color){
+		
 	}
 	
     function normalize(v) {

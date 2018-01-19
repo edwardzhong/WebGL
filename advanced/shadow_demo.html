@@ -161,7 +161,7 @@ var canvas = document.getElementById('canvas'),
     gl = get3DContext(canvas),
     OFFSCREEN_WIDTH = 2048,
     OFFSCREEN_HEIGHT = 2048,
-    viewAngleX=0,
+    viewAngleX=-10,
     viewAngleY=30,
     cViewAngleX=0,
     cViewAngleY=0,
@@ -187,7 +187,7 @@ function main() {
     var planeBuffers = createBufferInfoFromArrays(gl,Plane());
     var cubeBuffers = createBufferInfoFromArrays(gl,Cube([1,0.2,0,1]));
     var sphereBuffers = createBufferInfoFromArrays(gl,Sphere(50,[0.2,1,0,1]));
-    var cylinderBuffers = createBufferInfoFromArrays(gl,Cylinder(0.5,4,40,[0,0.3,1,1]));
+    var cylinderBuffers = createBufferInfoFromArrays(gl,Cylinder(0.8,4,40,[0,0.3,1,1]));
     var coneBuffers = createBufferInfoFromArrays(gl,Cone(1,4,40,[1,1,0,1]));
 
     // 初始化帧缓冲区对象 (FBO)  
@@ -295,7 +295,7 @@ function main() {
     }());
 
     function drawCone(program,vpMatrix){
-        modelMatrix.setTranslate( -3, 2, -2);
+        modelMatrix.setTranslate( -3, 2, -3);
         modelMatrix.rotate(angle, 1, 0, 0);
         mvpMatrix.set(vpMatrix);
         mvpMatrix.multiply(modelMatrix);
@@ -315,7 +315,7 @@ function main() {
     }
 
     function drawCylinder(program,vpMatrix){
-        modelMatrix.setTranslate( 1, 2, -2);
+        modelMatrix.setTranslate( 0, 2, 0);
         // modelMatrix.rotate(angle, 0, 1, 0);
         mvpMatrix.set(vpMatrix);
         mvpMatrix.multiply(modelMatrix);
@@ -335,8 +335,8 @@ function main() {
     }
 
     function drawSphere(program,vpMatrix){
-        modelMatrix.setTranslate( 0, 1.5, 1);
-        // modelMatrix.rotate(angle, 0, 1, 0);
+        modelMatrix.setRotate(angle, 0, 1, 0);
+        modelMatrix.translate( 1.5, 2, 1.5);
         mvpMatrix.set(vpMatrix);
         mvpMatrix.multiply(modelMatrix);
         normalMatrix.setInverseOf(modelMatrix);
@@ -355,7 +355,7 @@ function main() {
     }
 
     function drawCube(program,vpMatrix){
-        modelMatrix.setTranslate( 3, 1.5, 2);
+        modelMatrix.setTranslate( 3.5, 2, 3);
         modelMatrix.rotate(angle, 0, 1, 0);
         mvpMatrix.set(vpMatrix);
         mvpMatrix.multiply(modelMatrix);
