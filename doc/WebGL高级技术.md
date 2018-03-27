@@ -3,16 +3,16 @@
 
 0.如何实现选中物体
 
-    1.当鼠标按下，物体重绘为红色（或如何其他能区分的颜色）
+    1.当鼠标按下，物体重绘为红色 或如何其他能区分的颜色
     2.读取鼠标点击处像素的颜色 gl.readPixels(x,y,width,height,format,type,pixels)
     3.使用物体原来的颜色进行重绘，以恢复物体本来颜色
     4.用第2步读取到的颜色是红色，则点击中了
 
 1.如何实现雾化
 
-    实现雾化的方式由多种，这里使用最简单的一种：线性雾化（linear fog）。在线性雾化中，某一点的雾化程度取决于它与视点之间的距离，距离越远雾化程度越高。线性雾化有起点和终点，起点表示开始雾化之处，终点表示完全雾化之处两点之间某一点的雾化程度与该点与视点的距离呈线性关系。比终点更远的点完全雾化了，即完全看不见了。
+    实现雾化的方式由多种，这里使用最简单的一种：线性雾化 linear fog。在线性雾化中，某一点的雾化程度取决于它与视点之间的距离，距离越远雾化程度越高。线性雾化有起点和终点，起点表示开始雾化之处，终点表示完全雾化之处两点之间某一点的雾化程度与该点与视点的距离呈线性关系。比终点更远的点完全雾化了，即完全看不见了。
 
-    某一点雾化的程度可以被定义为雾化因子（fog factor），并在线性雾化公式中被计算出来：
+    某一点雾化的程度可以被定义为雾化因子 fog factor，并在线性雾化公式中被计算出来：
 
     <雾化因子> = (<终点> - <当前点与视点间的距离>) / (<终点> - <起点>)
     
@@ -40,10 +40,10 @@
     变量类型和名称/描述
 
     vec4 gl_FragCoord/片元在窗口坐标
-    vec4 gl_PointCoord/片元在被绘制的点内的坐标（从0.0到1.0）
+    vec4 gl_PointCoord/片元在被绘制的点内的坐标 从0.0到1.0
 
     gl_PointCoord坐标值的区间从0.0到1.0，如下图所示。
-    为了将矩形削成圆形，需要将与中心点（0.5, 0.5）距离超过0.5,也就是将圆外的片元剔除掉。在片元着色器中，可以使用discard语句来放弃当前片元。
+    为了将矩形削成圆形，需要将与中心点 0.5, 0.5距离超过0.5,也就是将圆外的片元剔除掉。在片元着色器中，可以使用discard语句来放弃当前片元。
 
     在片元着色器中的代码实现方式如下：
 
@@ -61,7 +61,7 @@
 
 5.α混合
 
-    我们要让物体实现半透明，实现这种效果需要用到颜色的a分量。该功能被称为a混合（alpha blending）或混合（blending），WebGL已经内置了该功能，值需要开启即可。
+    我们要让物体实现半透明，实现这种效果需要用到颜色的a分量。该功能被称为a混合 alpha blending或混合 blending，WebGL已经内置了该功能，值需要开启即可。
 
     如何实现a混合？
 
@@ -108,7 +108,7 @@
 
     上表中，(Rs,Gs,Bs, As)和(Rd,Gd,Bd,Ad)表示源颜色和目标颜色的各个分量。
 
-    假如源颜色是半透明的绿色（0.0, 1.0, 0.0, 0.4），目标颜色是普通的黄色（1.0, 1.0, 0.0, 1.0），调用函数：
+    假如源颜色是半透明的绿色 0.0, 1.0, 0.0, 0.4，目标颜色是普通的黄色 1.0, 1.0, 0.0, 1.0，调用函数：
 
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
 
@@ -124,7 +124,7 @@
 
     gl.depthMask(false);
 
-    4.绘制所有半透明的物体（a小于1.0），注意他们应当按照深度排序，然后从后向前绘制。
+    4.绘制所有半透明的物体 a小于1.0，注意他们应当按照深度排序，然后从后向前绘制。
 
     5.释放深度缓冲区，使之可读可写。调用：
 
@@ -134,27 +134,27 @@
 
     锁定或释放深度缓冲区的写入操作。参数：
 
-    mask:指定是锁定深度缓冲区的写入操作（false），还是释放之（true）
+    mask:指定是锁定深度缓冲区的写入操作 false，还是释放之 true
 
 9.渲染到文理
 
     WebGL可以把渲染的三维图形作为纹理贴到另一个三维物体上去。要实现这个功能，需要提到两个新的对象：帧缓冲区对象和渲染缓冲区对象。
-    帧缓冲区对象（framebuffer object）可以用来代替颜色缓冲区或深度缓冲区，如下图所示。绘制在帧缓冲区中的对象并不会直接显示canvas上，可以先对帧缓冲区中的内容进行一些处理再显示，或者直接用其中的内容作为纹理图像。在帧缓冲区中进行绘制的过程又称为离屏绘制（offscreen drawing）。
+    帧缓冲区对象 framebuffer object可以用来代替颜色缓冲区或深度缓冲区，如下图所示。绘制在帧缓冲区中的对象并不会直接显示canvas上，可以先对帧缓冲区中的内容进行一些处理再显示，或者直接用其中的内容作为纹理图像。在帧缓冲区中进行绘制的过程又称为离屏绘制 offscreen drawing。
 
-    帧缓冲区对象的结构如下图所示。绘制操作并不是直接发生在帧缓冲区中的，而是发生在帧缓冲区所关联的对象（attachment）上。一个帧缓冲区有3个关联对象：颜色缓冲区（color attachment）、深度缓冲区（depth attachment）、模板关联对象（stencil attachment），分别用来代码颜色缓冲区、深度缓冲区、模板缓冲区。
+    帧缓冲区对象的结构如下图所示。绘制操作并不是直接发生在帧缓冲区中的，而是发生在帧缓冲区所关联的对象 attachment上。一个帧缓冲区有3个关联对象：颜色缓冲区 color attachment、深度缓冲区 depth attachment、模板关联对象 stencil attachment，分别用来代码颜色缓冲区、深度缓冲区、模板缓冲区。
 
-    每个关联对象又可以是两种类型的：纹理对象或渲染缓冲区对象（renderbuffer object）。
+    每个关联对象又可以是两种类型的：纹理对象或渲染缓冲区对象 renderbuffer object。
 
 10.渲染到纹理，帧缓冲区配置步骤
 
-    1.创建帧缓冲区对象（gl.createFramebffer()）。
-    2.创建文理对象并设置其尺寸和参数（gl.createTexture()、gl.bindTexture()、gl.texImage2D()、gl.Parameteri()）。
-    3.创建渲染缓冲区对象（gl.createRenderbuffer()）.
-    4.绑定渲染缓冲区对象并设置其尺寸（gl.bindRenderBuffer()、gl.renderbufferStorage()）。
-    5.将帧缓冲区的颜色关联对象指定为一个文理对象（gl.frambufferTexture2D()）。
-    6.将帧缓冲区的深度关联对象指定为一个渲染缓冲区对象（gl.framebufferRenderbuffer()）。
-    7.检查帧缓冲区是否正确配置（gl.checkFramebufferStatus()）。
-    8.在帧缓冲区中进行绘制（gl.bindFramebuffer()）。
+    1.创建帧缓冲区对象 gl.createFramebffer()。
+    2.创建文理对象并设置其尺寸和参数 gl.createTexture()、gl.bindTexture()、gl.texImage2D()、gl.Parameteri()。
+    3.创建渲染缓冲区对象 gl.createRenderbuffer().
+    4.绑定渲染缓冲区对象并设置其尺寸 gl.bindRenderBuffer()、gl.renderbufferStorage()。
+    5.将帧缓冲区的颜色关联对象指定为一个文理对象 gl.frambufferTexture2D()。
+    6.将帧缓冲区的深度关联对象指定为一个渲染缓冲区对象 gl.framebufferRenderbuffer()。
+    7.检查帧缓冲区是否正确配置 gl.checkFramebufferStatus()。
+    8.在帧缓冲区中进行绘制 gl.bindFramebuffer()。
 
 11.gl.createFramebuffer()
 
@@ -200,10 +200,10 @@
     将texture指定的文理对象关联到绑定在target目标上的帧缓冲区。参数：
     target:必须是gl.FRAMEBUFFER
     attachment:指定关联的类型。包括：gl.COLOR_ATTACHMENT0,表示texture是颜色关联对象；gl.DEPTH_ATTACHMENT,表示texture是深度关联对象
-    textarget:同textureImage2D()函数的第一个参数（gl.TEXTURE_2D或gl.TEXTURE_CUBE）
+    textarget:同textureImage2D()函数的第一个参数 gl.TEXTURE_2D或gl.TEXTURE_CUBE
     texture:指定关联的文理对象
-    level:指定为0（在使用MIPMAP纹理时指定纹理的层级）
-    attachment参数的取值之一gl.COLOR_ATTACHMENT0，其中有个0。这是因为，在OpenGL中，帧缓冲区可以具有多个颜色关联对象（gl.COLOR_ATTACHMENT0, gl.COLOER_ATTACHMENT1等等），但WebGL中只可以有一个。
+    level:指定为0 在使用MIPMAP纹理时指定纹理的层级
+    attachment参数的取值之一gl.COLOR_ATTACHMENT0，其中有个0。这是因为，在OpenGL中，帧缓冲区可以具有多个颜色关联对象 gl.COLOR_ATTACHMENT0, gl.COLOER_ATTACHMENT1等等，但WebGL中只可以有一个。
 
 19.gl.framebufferRenderbuffer(target, attachment, renderbuffertarget, renderbuffer)
 
@@ -227,13 +227,13 @@
 
 22.绘制阴影
 
-    实现阴影有若干不同的方法，经常采用的是阴影贴图（shadow map），或称深度贴图（depth map）。
+    实现阴影有若干不同的方法，经常采用的是阴影贴图 shadow map，或称深度贴图 depth map。
     该方法具有较好的表现力，在多种计算机图形学的场合，甚至电影特效总都有所使用。
-    我们需要用到光源和物体之间的距离（实际上也就是物体在光源坐标系下的深度z值）来决定物体是否可见。如下图所示，同一条光线上有两个点P1和P2，由于P2的z值大于P1，所以P2在阴影中。
+    我们需要用到光源和物体之间的距离 实际上也就是物体在光源坐标系下的深度z值来决定物体是否可见。如下图所示，同一条光线上有两个点P1和P2，由于P2的z值大于P1，所以P2在阴影中。
 
     我们需要使用两对着色器以实现阴影：
-    （1）一对着色器用来计算光源到物体的距离，
-    （2）另一对着色器根据(1)中计算出的距离绘制场景。使用一张文理图像把（1）的结果传入（2）中，这张文理图像就被称为阴影贴图（shadow map），而通过阴影贴图实现阴影的方法就被称为阴影映射（shadow mapping）。
+     1一对着色器用来计算光源到物体的距离，
+     2另一对着色器根据(1)中计算出的距离绘制场景。使用一张文理图像把 1的结果传入 2中，这张文理图像就被称为阴影贴图 shadow map，而通过阴影贴图实现阴影的方法就被称为阴影映射 shadow mapping。
 
 23.读取OBJ模型文件步骤
 
@@ -243,10 +243,10 @@
 
     3.准备Float32Array类型的数组normals，从文件中读取模型的顶点法线数据并保存到其中；
 
-    4.准备Unit32Array（或Uint8Array）类型的数组indices,从文件中读取顶点索引数据并保存在其中，顶点索引数据定义了组成整个模型的三角序列；
+    4.准备Unit32Array 或Uint8Array类型的数组indices,从文件中读取顶点索引数据并保存在其中，顶点索引数据定义了组成整个模型的三角序列；
 
     5.将前4步骤获取的数据写入缓冲区中，调用gl.drawElements()以绘制出整个立方体；
 
 24.OBJ文件格式
 
-    OBJ格式的文件由若干个部分组成，包括顶点坐标部分、表面定义部分、材质（material，即表面的样式，可能是单色或渐变色，也可能贴有纹理）定义部分等。每个部分定义了多个顶点、法线、表面等等。
+    OBJ格式的文件由若干个部分组成，包括顶点坐标部分、表面定义部分、材质 material，即表面的样式，可能是单色或渐变色，也可能贴有纹理定义部分等。每个部分定义了多个顶点、法线、表面等等。

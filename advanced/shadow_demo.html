@@ -136,7 +136,7 @@
         // pcf 消除阴影边缘的锯齿
         float shadows =0.0;
         float opacity=0.6;// 阴影alpha值, 值越小暗度越深
-        float texelSize=1.0/2048.0;// 阴影像素尺寸,值越小阴影越逼真
+        float texelSize=1.0/1024.0;// 阴影像素尺寸,值越小阴影越逼真
         vec4 rgbaDepth;
 
         for(float y=-1.5; y <= 1.5; y += 1.0){
@@ -159,8 +159,8 @@
 
 var canvas = document.getElementById('canvas'),
     gl = get3DContext(canvas),
-    OFFSCREEN_WIDTH = 2048,
-    OFFSCREEN_HEIGHT = 2048,
+    OFFSCREEN_WIDTH = 1024,
+    OFFSCREEN_HEIGHT = 1024,
     viewAngleX=-10,
     viewAngleY=30,
     cViewAngleX=0,
@@ -335,8 +335,8 @@ function main() {
     }
 
     function drawSphere(program,vpMatrix){
-        modelMatrix.setRotate(angle, 0, 1, 0);
-        modelMatrix.translate( 1.5, 2, 1.5);
+        // modelMatrix.setRotate(angle, 0, 1, 0);
+        modelMatrix.setTranslate( 1.5, 2, 1.5);
         mvpMatrix.set(vpMatrix);
         mvpMatrix.multiply(modelMatrix);
         normalMatrix.setInverseOf(modelMatrix);
@@ -429,6 +429,7 @@ function mouseUp(e) {
     LENPERCENT = 1;
     canvas.removeEventListener('mouseup', arguments.callee, false);
     canvas.removeEventListener('mousemove', mouseMove, false);
+    canvas.removeEventListener('mouseout', mouseUp, false);
 }
 main();
 </script>

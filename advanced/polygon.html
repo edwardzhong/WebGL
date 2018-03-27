@@ -98,8 +98,8 @@ function main() {
     var program = createProgramInfo(gl, ['vs', 'fs']),
         sphereBuffer = createBufferInfoFromArrays(gl, Sphere(50)),
         cubeBuffer = createBufferInfoFromArrays(gl, Cube()),
-        cylinderBuffer = createBufferInfoFromArrays(gl, Cylinder(0.5, 2, 40)),
-        coneBuffer = createBufferInfoFromArrays(gl, Cone(0.5, 2, 40)),
+        cylinderBuffer = createBufferInfoFromArrays(gl, Cylinder(1, 3, 40)),
+        coneBuffer = createBufferInfoFromArrays(gl, Cone(1, 3, 40)),
         buffers = [sphereBuffer, cubeBuffer, cylinderBuffer, coneBuffer];
 
     for (var i = 0; i < NUM; i++) {

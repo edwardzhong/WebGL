@@ -722,7 +722,7 @@
         }
     }
 
-        /**
+    /**
      * 初始化帧缓冲区对象 (FBO)  
      * @param  {Object} gl 上下文
      * @return {Object}    
