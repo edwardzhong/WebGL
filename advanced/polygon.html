@@ -82,6 +82,7 @@ var canvas = document.getElementById('canvas'),
     cViewAngleY = 0,
     viewLEN = 25,
     LENPERCENT = 1,
+    LENS = 1,
     LIGHT_POS = [100, 0, -100], //光源位置1
     LIGHT_POS2 = [-100, 0, 100], //光源位置2
     Polygons = [],
@@ -132,11 +133,19 @@ function main() {
             elapsed = now - last;
 
         last = now;
-
         var angleX = (viewAngleX + cViewAngleX) % 360;
-        angleY = viewAngleY + cViewAngleY,
-            len = viewLEN * LENPERCENT;
-        angleY = angleY > 90 ? 90 : angleY < 10 ? 10 : angleY;
+            angleY = viewAngleY + cViewAngleY,
+            // len = viewLEN * LENPERCENT;
+            len = viewLEN + LENS;
+
+        // if(angleY<-270){
+        //     angleY+=360
+        // }
+        // if(angleY>270){
+        //     angleY-=360
+        // }
+
+        // angleY = angleY > 90 ? 90 : angleY < 10 ? 10 : angleY;
         len = len > 100 ? 100 : len < 6 ? 6 : len;
 
         var eyeY = len * Math.sin(angleY * Math.PI / 180),
@@ -207,8 +216,8 @@ function mouseMove(e) {
 
     cViewAngleX = radX * 180 / Math.PI;
     cViewAngleY = radY * 180 / Math.PI;
-    cViewAngleY > 90 ? 90 : cViewAngleY < -90 ? -90 : cViewAngleY;
-    LENPERCENT = b / a;
+    // cViewAngleY > 90 ? 90 : cViewAngleY < -90 ? -90 : cViewAngleY;
+    // LENPERCENT = b / a;
 }
 
 function mouseUp(e) {
@@ -216,11 +225,25 @@ function mouseUp(e) {
     cViewAngleX = 0;
     viewAngleY += cViewAngleY;
     cViewAngleY = 0;
-    viewLEN *= LENPERCENT;
-    LENPERCENT = 1;
+    // viewLEN *= LENPERCENT;
+    // LENPERCENT = 1;
     canvas.removeEventListener('mouseup', arguments.callee, false);
     canvas.removeEventListener('mousemove', mouseMove, false);
 }
+
+document.addEventListener('mousewheel', function(e){
+    var val = 0;
+    e = e || window.event;
+
+    if (e.wheelDelta) { //IE/Opera/Chrome
+        val = e.wheelDelta;
+    } else if (e.detail) { //Firefox
+        val = e.detail;
+    }
+
+    LENS +=val/3;
+
+}, false);
 
 main();
 </script>
