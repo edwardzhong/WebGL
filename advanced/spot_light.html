@@ -245,7 +245,7 @@ function main() {
         viewProjMatrix.setPerspective(35, canvas.width / canvas.height, 1.0, 100.0);
         viewProjMatrix.lookAt(eyeX,eyeY,eyeZ, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0);
         gl.bindFramebuffer(gl.FRAMEBUFFER, fbo); // 切换绘制场景为帧缓冲区  
-        gl.viewport(0, 0, OFFSCREEN_HEIGHT, OFFSCREEN_HEIGHT); // 设置帧绘图区域
+        gl.viewport(0, 0, OFFSCREEN_WIDTH, OFFSCREEN_HEIGHT); // 设置帧绘图区域
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT); // Clear FBO    
         /*
          *   阴影着色器

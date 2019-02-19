@@ -86,7 +86,7 @@ var canvas = document.getElementById('canvas'),
     LIGHT_POS = [100, 0, -100], //光源位置1
     LIGHT_POS2 = [-100, 0, 100], //光源位置2
     Polygons = [],
-    NUM = 160,
+    NUM = 200,
     CENTER = { x: canvas.width / 2, y: canvas.height / 2 },
     START = {};
 
@@ -122,11 +122,17 @@ function main() {
 
     gl.useProgram(program.program);
 
+    setUniforms(program, {
+        u_lightColor: [1, 1, 1],
+        u_lightPosition: LIGHT_POS,
+        u_lightPosition2: LIGHT_POS2,
+        u_ambientColor: [0.4, 0.4, 0.4]
+    });
+
     var modelMatrix = new Matrix4(),
         normalMatrix = new Matrix4(),
         mvpMatrix = new Matrix4(),
         last = Date.now();
-
 
     (function animate() {
         var now = new Date(),
@@ -155,14 +161,6 @@ function main() {
 
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-        setUniforms(program, {
-            u_lightColor: [1, 1, 1],
-            u_lightPosition: LIGHT_POS,
-            u_lightPosition2: LIGHT_POS2,
-            u_ambientColor: [0.4, 0.4, 0.4],
-            u_viewPosition: [eyeX, eyeY, eyeZ]
-        });
-
         var buffer;
         Polygons.forEach((polygon, i) => {
             polygon.xAngle += polygon.xRotation * elapsed / 1000;
@@ -184,9 +182,11 @@ function main() {
             // 逆转置矩阵
             normalMatrix.setInverseOf(modelMatrix);
             normalMatrix.transpose();
+            
             buffer = buffers[i % buffers.length];
             setBuffersAndAttributes(gl, program, buffer);
             setUniforms(program, {
+                u_viewPosition: [eyeX, eyeY, eyeZ],
                 u_color: polygon.color,
                 u_modelMatrix: modelMatrix.elements,
                 u_normalMatrix: normalMatrix.elements,

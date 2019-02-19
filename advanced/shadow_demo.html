@@ -135,7 +135,7 @@
 
         // pcf 消除阴影边缘的锯齿
         float shadows =0.0;
-        float opacity=0.6;// 阴影alpha值, 值越小暗度越深
+        float opacity=0.3;// 阴影alpha值, 值越小暗度越深
         float texelSize=1.0/1024.0;// 阴影像素尺寸,值越小阴影越逼真
         vec4 rgbaDepth;
 
@@ -335,8 +335,8 @@ function main() {
     }
 
     function drawSphere(program,vpMatrix){
-        // modelMatrix.setRotate(angle, 0, 1, 0);
-        modelMatrix.setTranslate( 1.5, 2, 1.5);
+        modelMatrix.setRotate(angle, 0, 1, 0);
+        modelMatrix.translate( 1.5, 2, 1.5);
         mvpMatrix.set(vpMatrix);
         mvpMatrix.multiply(modelMatrix);
         normalMatrix.setInverseOf(modelMatrix);
