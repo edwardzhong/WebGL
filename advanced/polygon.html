@@ -7,10 +7,10 @@
 <body>
 <p>拖动鼠标可旋转和缩放画面</p>
 <canvas id="canvas" width="700" height="500"></canvas>
-<script src="../js/webgl-util.js"></script>
-<script src="../js/matrix.js"></script>
-<script src="../js/util.js"></script>
-<script src="../js/polygon.js"></script>
+<script src="../../graphics/webgl-util.js"></script>
+<script src="../../graphics/matrix.js"></script>
+<script src="../../graphics/util.js"></script>
+<script src="../../graphics/polygon.js"></script>
 <script type="x-shader/x-vertex" id="vs">
   attribute vec4 a_position;
   attribute vec4 a_normal;
@@ -105,14 +105,14 @@ function main() {
 
     for (var i = 0; i < NUM; i++) {
         Polygons.push({
-            xRotation: Random(-60, 60),
-            yRotation: Random(-60, 60),
+            xRotation: random(-60, 60),
+            yRotation: random(-60, 60),
             xAngle: 0,
             yAngle: 0,
-            x: Random(-15, 15),
-            y: Random(-15, 15),
-            z: Random(3, 25),
-            color: Color.rgbToWebgl(Color.hslToRgb(RandomHsl()))
+            x: random(-15, 15),
+            y: random(-15, 15),
+            z: random(3, 25),
+            color: Color.rgbToWebgl(Color.hslToRgb(randomHsl()))
         });
     }
 
