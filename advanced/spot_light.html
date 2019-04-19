@@ -209,6 +209,7 @@ function main() {
     gl.enable(gl.DEPTH_TEST);
     // gl.polygonOffset(1.0, 1.0)
     // gl.enable(gl.CULL_FACE);
+    // gl.cullFace(gl.BACK);
     
     var viewProjMatrixFromLight = new Matrix4(); // 光源处观察的视图投影矩阵(阴影着色器)
     viewProjMatrixFromLight.setPerspective(90, OFFSCREEN_WIDTH / OFFSCREEN_HEIGHT, 1.0, 100.0);

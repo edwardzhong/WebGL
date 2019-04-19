@@ -6,22 +6,22 @@
 </head>
 <body>
 <canvas id="canvas" width="400" height="400"></canvas>
-<script src="../js/webgl.js"></script>
-<script type="x-shader/x-vertex" id="vs">
-	attribute vec4 a_Position;
-	attribute vec4 a_Color;
-	varying vec4 v_Color;
+<script src="../../graphics/webgl-util.js"></script>
+<script type="x-shader/x-vertex" id="vs">#version 300 es
+	in vec4 a_position;
+	in vec4 a_color;
+	out vec4 v_color;
 	void main() { 
-		gl_Position=a_Position;
-		v_Color=a_Color;
+		gl_Position=a_position;
+		v_color=a_color;
 	} 
 </script>
-<script type="x-shader/x-fragment" id="fs">
+<script type="x-shader/x-fragment" id="fs">#version 300 es
 	precision mediump float;
-	varying vec4 v_Color;
+	in vec4 v_color;
+	out vec4 o_fragColor;
 	void main() {
-		// gl_FragColor = vec4(1,1,1,1);
-		gl_FragColor = v_Color;
+		o_fragColor = v_color;
 	}
 </script>
 <script>
@@ -39,18 +39,18 @@
 			return;
 		}
 		gl.clearColor(0.0, 0.0, 0.0, 1.0);
-		var a_Position = gl.getAttribLocation(gl.program, 'a_Position');
-		var a_Color = gl.getAttribLocation(gl.program, 'a_Color');
+		var a_position = gl.getAttribLocation(gl.program, 'a_position');
+		var a_color = gl.getAttribLocation(gl.program, 'a_color');
 
 		// 第一组数据
 		var triangleArray = gl.createVertexArray();
 		gl.bindVertexArray(triangleArray);
-		initOne(a_Position,a_Color);
+		initOne(a_position,a_color);
 
 		// 第二组数据
 		var triangleArray2 = gl.createVertexArray();
 		gl.bindVertexArray(triangleArray2);
-		initSecond(a_Position,a_Color);
+		initSecond(a_position,a_color);
 
 		////////////////
 		// DRAW
@@ -64,35 +64,35 @@
 		gl.drawArrays(gl.TRIANGLES, 0, 3);
 	}
 
-	function initOne(a_Position,a_Color){
+	function initOne(a_position,a_color){
 		var positions = new Float32Array([
 			-0.5, -0.5, 0.0,
 		    0.0, -0.5, 0.0,
 		    0.0, 0.0, 0.0
 		]);
-		initBuffer(a_Position,positions,3);
+		initBuffer(a_position,positions,3);
 
 		var colors = new Float32Array([
 		    1.0, 0.0, 0.0,
 		    0.0, 1.0, 0.0,
 		    0.0, 0.0, 1.0
 		]);
-		initBuffer(a_Color,colors,3);		
+		initBuffer(a_color,colors,3);		
 	}
 
-	function initSecond(a_Position,a_Color){
+	function initSecond(a_position,a_color){
 		var positions2 = new Float32Array([
 		    0.0, 0.0, 0.0,
 		    0.5, 0.0, 0.0,
 		    0.0, 0.5, 0.0
 		]);
-		initBuffer(a_Position,positions2,3);
+		initBuffer(a_position,positions2,3);
 		var colors2 = new Float32Array([
 		    1.0, 1.0, 0.0,
 		    0.0, 1.0, 1.0,
 		    0.0, 1.0, 1.0
 		]);
-		initBuffer(a_Color,colors2,3);
+		initBuffer(a_color,colors2,3);
 	}
 	
 	function initBuffer(attribute,data,num){
