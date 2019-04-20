@@ -1,0 +1,69 @@
+html,
+body {
+  font-family: "Roboto", "Helvetica Neue", Helvetica, "Hiragino Sans GB", "Microsoft YaHei", Arial, sans-serif;
+  font-size: 14px;
+  color: #55595e;
+  background-color: #f2f2f2;
+  width: 100%;
+  height: 100%;
+}
+body,
+p,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  margin: 0;
+}
+ul,
+ol {
+  list-type: none;
+  margin: 0;
+  padding: 0;
+}
+a,
+a:active,
+a:hover {
+  text-decoration: none;
+}
+select {
+  appearance: none;
+}
+input,
+textarea {
+  outline: none;
+  resize: none;
+}
+img,
+a {
+  -webkit-touch-callout: none;
+}
+.header {
+  display: block;
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 0.8rem;
+  line-height: 0.8rem;
+  background-color: #2EABDF;
+  box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.075), 0 0 8px rgba(102, 175, 233, 0.6);
+  color: #fff;
+  font-size: 0.4rem;
+  font-weight: bold;
+  text-align: center;
+  z-index: 99;
+}
+.header i {
+  float: right;
+  padding-right: 0.2rem;
+  cursor: pointer;
+}
+.header-pos,
+.footer-pos {
+  display: block;
+  width: 100%;
+  height: 0.85rem;
+}

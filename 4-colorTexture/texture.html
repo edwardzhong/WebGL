@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<title>贴图</title>
+</head>
+<body>
+<canvas id="canvas" width="400" height="400"></canvas>
+<script src="../../graphics/webgl-util.js"></script>
+<script type="x-shader/x-vertex" id="vs">
+	attribute vec4 a_Position; //限定符，类型(4个浮点数的矢量)，变量名称：顶点，attribute变量传输与顶点有关的数据，表示逐顶点的信息(顶点依次传递给它的意思) 
+	attribute vec2 a_TexCoord;
+	varying vec2 v_TexCoord;
+	void main() { 
+		gl_Position = a_Position;
+		v_TexCoord = a_TexCoord;
+	} 
+</script>
+<script type="x-shader/x-fragment" id="fs">
+	precision mediump float; // 精度限定
+	uniform sampler2D u_Sampler0;
+	uniform sampler2D u_Sampler1;
+	varying vec2 v_TexCoord;
+	void main() {
+		vec4 color0 = texture2D(u_Sampler0, v_TexCoord);
+		vec4 color1 = texture2D(u_Sampler1, v_TexCoord);
+		gl_FragColor = color0 * color1;
+	}
+</script>
+<script>
+	var	canvas=document.getElementById('canvas'),
+		gl=get3DContext(canvas,true);
+
+	function main() {
+		if (!gl) {
+			console.log('Failed to get the rendering context for WebGL');
+			return;
+		}
+
+		if (!initProgram(gl, 'fs', 'vs',true)) {
+			console.log('Failed to intialize shaders.');
+			return;
+		}
+
+		/**
+		 * 混合缓冲区(包括元素和贴图顶点)
+		 */
+		// 创建缓冲区并传人顶点
+		var verticesTexCoords=new Float32Array([
+			-0.5, 0.5, 0,1,
+			-0.5, -0.5, 0,0,
+			0.5, 0.5,1,1,
+			0.5, -0.5,1,0
+		]);
+		if(!createBuffer(verticesTexCoords)){
+		    console.log('Failed to create the buffer object');
+		    return;
+		}
+
+		// 每个元素的字节
+		var FSIZE = verticesTexCoords.BYTES_PER_ELEMENT;
+		// 获取顶点位置
+		var a_Position = gl.getAttribLocation(gl.program, 'a_Position');
+		// (地址,每个顶点分量的个数<1-4>,数据类型<整形，符点等>,是否归一化,指定相邻两个顶点间字节数<默认0>,指定缓冲区对象偏移字节数量<默认0>)
+		gl.vertexAttribPointer(a_Position, 2, gl.FLOAT, false, 4*FSIZE, 0);
+		// Enable the assignment to a_Position variable
+		gl.enableVertexAttribArray(a_Position);
+
+		//贴图顶点位置
+		var a_TexCoord = gl.getAttribLocation(gl.program, 'a_TexCoord');
+		gl.vertexAttribPointer(a_TexCoord, 2, gl.FLOAT, false, 4*FSIZE, 2*FSIZE);
+		gl.enableVertexAttribArray(a_TexCoord);
+
+
+		// 创建贴图对象
+		var texture0 = gl.createTexture(),
+			texture1 = gl.createTexture();
+		if (!texture0 || !texture1) {
+			console.log('Failed to create the texture object');
+			return false;
+		}
+		// 获取贴图变量地址
+		var u_Sampler0 = gl.getUniformLocation(gl.program, 'u_Sampler0'),
+			u_Sampler1 = gl.getUniformLocation(gl.program, 'u_Sampler1');
+		if (!u_Sampler0 || !u_Sampler1) {
+			console.log('Failed to get the storage location of u_Sampler');
+			return false;
+		}
+
+		// 加载图片
+		var img0 = new Image(),
+			img1 = new Image();
+		img0.onload = function(){ loadTexture(texture0, u_Sampler0, img0, 0); };
+		img1.onload = function(){ loadTexture(texture1, u_Sampler1, img1, 1); };
+		img0.src = '../img/sky.jpg';
+		img1.src = '../img/circle.gif';
+
+		//设置背景颜色，清屏
+		gl.clearColor(0.0, 0.0, 0.0, 1.0);
+		gl.clear(gl.COLOR_BUFFER_BIT);
+
+	}
+	var g_texUnit0=false,g_texUnit1=false;
+	function loadTexture(texture, u_Sampler, image, texUnit) {
+		gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, 1);// Y轴反转，webgl坐标系不同于web坐标系
+		if (texUnit == 0) {
+			gl.activeTexture(gl.TEXTURE0);
+			g_texUnit0 = true;
+		} else {
+			gl.activeTexture(gl.TEXTURE1);
+			g_texUnit1 = true;
+		}
+		// 绑定纹理对象 TEXTURE_2D二维／TEXTURE_CUBE_MAP立方体
+		gl.bindTexture(gl.TEXTURE_2D, texture);   
+
+		// 设置纹理对象参数(TEXTURE_MIN_FILTER/TEXTURE_MAG_FILTER/TEXTURE_WRAP_S/TEXTURE_WRAP_T)
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+		// 将图形分配给纹理对象
+		gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+		// 将纹理单元传递给片元着色器
+		gl.uniform1i(u_Sampler, texUnit);
+	
+		gl.clear(gl.COLOR_BUFFER_BIT);
+
+		//所有图片都加载好之后
+		if (g_texUnit0 && g_texUnit1) {
+			// (基本图形，第几个顶点，执行几次)，修改基本图形项可以生成点，线，三角形，矩形，扇形等
+			gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+		}
+	}
+	/**
+	* 创建缓冲区
+	* @param  {Array} data
+	* @param  {Object} bufferType
+	* @return {Object}     
+	*/
+	function createBuffer(data,bufferType){  
+		// 生成缓存对象  
+		var buffer = gl.createBuffer();  
+		if (!buffer) {
+			console.log('Failed to create the buffer object');
+			return null;
+		}
+		// 绑定缓存(gl.ARRAY_BUFFER<顶点>||gl.ELEMENT_ARRAY_BUFFER<顶点索引>) 
+		gl.bindBuffer(bufferType||gl.ARRAY_BUFFER, buffer);  
+
+		// 向缓存中写入数据  
+		gl.bufferData(bufferType||gl.ARRAY_BUFFER, data, gl.STATIC_DRAW);  
+
+		// 将绑定的缓存设为无效  
+		// gl.bindBuffer(gl.ARRAY_BUFFER, null);  
+
+		// 返回生成的buffer  
+		return buffer;
+	} 
+	main();
+</script>
+</body>
+</html>

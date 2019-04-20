@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<title>顶点尺寸颜色(多个缓冲区)</title>
+</head>
+<body>
+<h3>多个缓冲区分别存储不同类型的数据，适合数据量不大的情况</h3>
+<canvas id="canvas" width="400" height="400"></canvas>
+<script src="../js/webgl.js"></script>
+<script type="x-shader/x-vertex" id="vs">
+	attribute vec4 a_Position; //限定符，类型(4个浮点数的矢量)，变量名称：顶点，attribute变量传输与顶点有关的数据，表示逐顶点的信息(顶点依次传递给它的意思) 
+	attribute float a_PositionSize;
+	attribute vec4 a_Color;
+	varying vec4 v_color;// 连接片元着色器
+	void main() { 
+		gl_Position = a_Position;
+		gl_PointSize = a_PositionSize; 
+		v_color=a_Color;//传递给片元着色器变量
+	} 
+</script>
+<script type="x-shader/x-fragment" id="fs">
+	precision mediump float; // 精度限定
+	varying vec4 v_color; 
+	void main() {
+		gl_FragColor = v_color;
+	}
+</script>
+<script>
+	var	canvas=document.getElementById('canvas'),
+		gl=get3DContext(canvas,true);
+
+	function main() {
+		if (!gl) {
+			console.log('Failed to get the rendering context for WebGL');
+			return;
+		}
+
+		if (!initProgram(gl, 'fs', 'vs',true)) {
+			console.log('Failed to intialize shaders.');
+			return;
+		}
+
+		/**
+		 * 顶点缓冲区
+		 */
+		// 创建缓冲区并传人顶点
+		var vertices=new Float32Array([
+			-0.5, 0.5,
+			-0.5, -0.5,
+			0.5, 0.5,
+			0.5, -0.5 
+		]);
+		if(!createBuffer(vertices))return; 
+
+		// 获取顶点位置
+		var a_Position = gl.getAttribLocation(gl.program, 'a_Position');
+		// (地址,每个顶点分量的个数<1-4>,数据类型<整形，符点等>,是否归一化,指定相邻两个顶点间字节数<默认0>,指定缓冲区对象偏移量<默认0>)
+		gl.vertexAttribPointer(a_Position, 2, gl.FLOAT, false, 0, 0);
+		// Enable the assignment to a_Position variable
+		gl.enableVertexAttribArray(a_Position);
+
+		/**
+		 * 顶点尺寸缓冲区
+		 */
+		// 创建缓冲区并传人尺寸
+		var sizes=new Float32Array([10,20,30,40 ])
+		if(!createBuffer(sizes)) return; 
+		// 获取attribute变量的尺寸，并赋值
+		var a_PositionSize = gl.getAttribLocation(gl.program, 'a_PositionSize');
+		gl.vertexAttribPointer(a_PositionSize, 1, gl.FLOAT, false, 0, 0);
+		gl.enableVertexAttribArray(a_PositionSize);
+
+		/**
+		 * 颜色缓冲区
+		 */
+		var colors=new Float32Array([
+			1,0,0,1,
+			0,1,0,1,
+			0,0,1,1,
+			1,1,0,1
+		])
+		if(!createBuffer(colors)) return; 
+		// 获取a_Color变量的存储地址并赋值
+		var a_Color = gl.getUniformLocation(gl.program, 'a_Color');
+		gl.vertexAttribPointer(a_Color, 4, gl.FLOAT, false, 0, 0);
+		gl.enableVertexAttribArray(a_Color);
+
+		//设置背景颜色，清屏
+		gl.clearColor(0.0, 0.0, 0.0, 1.0);
+		gl.clear(gl.COLOR_BUFFER_BIT);
+
+		// (基本图形，第几个顶点，执行几次)，修改基本图形项可以生成点，线，三角形，矩形，扇形等
+		gl.drawArrays(gl.POINTS, 0, 4);
+	}
+	/**
+	* 创建缓冲区
+	* @param  {Array} data
+	* @param  {Object} bufferType
+	* @return {Object}     
+	*/
+	function createBuffer(data,bufferType){  
+		// 生成缓存对象  
+		var buffer = gl.createBuffer();  
+		if (!buffer) {
+			console.log('Failed to create the buffer object');
+			return null;
+		}
+		// 绑定缓存(gl.ARRAY_BUFFER<顶点>||gl.ELEMENT_ARRAY_BUFFER<顶点索引>) 
+		gl.bindBuffer(bufferType||gl.ARRAY_BUFFER, buffer);  
+
+		// 向缓存中写入数据  
+		gl.bufferData(bufferType||gl.ARRAY_BUFFER, data, gl.STATIC_DRAW);  
+
+		// 将绑定的缓存设为无效  
+		// gl.bindBuffer(gl.ARRAY_BUFFER, null);  
+
+		// 返回生成的buffer  
+		return buffer;
+	} 
+	main();
+
+</script>
+</body>
+</html>

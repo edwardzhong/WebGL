@@ -1,0 +1,27 @@
+{% extends '../layout/layout.html' %}
+{% block title %}dining room{% endblock %}
+{% block js %}
+<script src="./js/room.js"></script>
+{% endblock %}
+{% block content %}
+<div class="content">
+<p>上下左右方向键 调整视角，W/S/A/D/Q/E键 旋转模型， +/-键 放大缩小</p>
+<canvas id="canvas" width="1000" height="600"></canvas>
+</div>
+<!-- obj文件 -->
+<script type="text/template" id="tplObj">
+{% include '../model/room2.obj' %}
+</script>
+<!-- mtl文件 -->
+<script type="text/template" id="tplMtl">
+{% include '../model/room2.mtl' %}
+</script>
+<!-- 顶点着色器 -->
+<script type="x-shader/x-vertex" id="vs">
+{% include '../glsl/vs.glsl' %}
+</script>
+<!-- 片元着色器 -->
+<script type="x-shader/x-fragment" id="fs">
+{% include '../glsl/fs.glsl' %}	
+</script>
+{% endblock %}

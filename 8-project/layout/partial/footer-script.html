@@ -1,0 +1,1 @@
+<script> function loadPercent(percent){ var wrap=document.getElementById('loading'), txt=wrap.getElementsByClassName('txt')[0]; if(wrap.style.display=='none'){return;} percent=percent <0?0:percent>100?100:percent; txt.innerHTML = percent+'%'; if(percent==100){ wrap.style.display='none'; } } loadPercent(30); </script>

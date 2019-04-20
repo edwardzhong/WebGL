@@ -1,0 +1,160 @@
+html,
+body {
+  font-family: "Roboto", "Helvetica Neue", Helvetica, "Hiragino Sans GB", "Microsoft YaHei", Arial, sans-serif;
+  font-size: 0.25rem;
+  color: #555;
+  width: 100%;
+  height: 100%;
+  user-select: none;
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+  font-size-adjust: 100%;
+}
+body,
+p,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  margin: 0;
+}
+ul,
+ol {
+  list-type: none;
+  margin: 0;
+  padding: 0;
+}
+a,
+a:active,
+a:hover {
+  text-decoration: none;
+}
+select {
+  appearance: none;
+}
+input,
+textarea {
+  outline: none;
+  resize: none;
+}
+img,
+a {
+  -webkit-touch-callout: none;
+}
+.header {
+  display: block;
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 0.8rem;
+  line-height: 0.8rem;
+  background-color: #2EABDF;
+  box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.075), 0 0 8px rgba(102, 175, 233, 0.6);
+  color: #fff;
+  font-size: 0.4rem;
+  font-weight: bold;
+  text-align: center;
+  z-index: 99;
+}
+.header i {
+  float: right;
+  padding-right: 0.2rem;
+  cursor: pointer;
+}
+.header-pos,
+.footer-pos {
+  display: block;
+  width: 100%;
+  height: 0.85rem;
+}
+.content {
+  padding: 0.2rem;
+  display: flex;
+  flex-flow: row wrap;
+  align-content: center;
+}
+.content > * {
+  margin: 0.1rem;
+}
+.form-wrap {
+  padding: 0.3rem;
+}
+.menu-item {
+  border-bottom: 1px solid #eef;
+}
+.menu-link span {
+  float: right;
+}
+.dialog-wrap {
+  display: none;
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.3);
+  opacity: 0;
+  z-index: 999;
+  transition: all .6s;
+}
+.dialog-wrap.active {
+  opacity: 1;
+  display: block;
+}
+.info-dialog {
+  position: absolute;
+  width: 320px;
+  max-width: 480px;
+  top: 30%;
+  left: 50%;
+  background-color: #fff;
+  border: 1px solid #eee;
+  border-radius: 6px;
+  box-shadow: 1px 1px 5px rgba(0, 0, 0, 0.2);
+  -webkit-transform: translate(-50%, -50%);
+  transform: translate(-50%, -50%);
+  text-align: center;
+  z-index: 1000;
+}
+.info-dialog .dialog-title {
+  font-size: 18px;
+  padding: 15px;
+}
+.info-dialog .dialog-title h3 {
+  margin: 0;
+}
+.info-dialog .dialog-text {
+  font-size: 16px;
+  margin: 0;
+  padding: 15px;
+}
+.info-dialog .dialog-footer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 15px;
+  border-top: 1px solid #eee;
+}
+.info-dialog .dialog-footer .confirm,
+.info-dialog .dialog-footer .cancel {
+  display: block;
+  font-size: 16px;
+  padding: 0 15px;
+  font-weight: bold;
+  cursor: pointer;
+}
+.info-dialog .dialog-footer .confirm {
+  color: #30aadf;
+}
+.info-dialog .dialog-footer .confirm:hover {
+  color: #1e8ebe;
+}
+.info-dialog .dialog-footer .cancel {
+  color: #787878;
+}
+.info-dialog .dialog-footer .cancel:hover {
+  color: #5e5e5e;
+}

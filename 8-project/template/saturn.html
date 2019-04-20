@@ -1,0 +1,35 @@
+{% extends '../layout/layout.html' %}
+{% block title %}saturn{% endblock %}
+{% block js %}
+<script src="./js/saturn.js"></script>
+{% endblock %}
+{% block content %}
+<div class="content">
+<p></p>
+<canvas id="canvas" width="1000" height="600"></canvas>
+</div>
+<!-- obj文件 -->
+<script type="text/template" id="tplObj">
+{% include '../model/cellfracture.obj' %}
+</script>
+<!-- mtl文件 -->
+<script type="text/template" id="tplMtl">
+{% include '../model/cellfracture.mtl' %}
+</script>
+<!-- 顶点着色器 -->
+<script type="x-shader/x-vertex" id="vs">
+{% include '../glsl/vs2.glsl' %}
+</script>
+<!-- 片元着色器 -->
+<script type="x-shader/x-fragment" id="fs">
+{% include '../glsl/fs2.glsl' %}	
+</script>
+<!-- 顶点着色器 -->
+<script type="x-shader/x-vertex" id="svs">
+{% include '../glsl/svs.glsl' %}
+</script>
+<!-- 片元着色器 -->
+<script type="x-shader/x-fragment" id="sfs">
+{% include '../glsl/sfs.glsl' %}	
+</script>
+{% endblock %}

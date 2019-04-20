@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<title>{% block title %}{% endblock %}</title>
+{% include './partial/meta.html' %}
+<!-- 页面内加载的头部js -->
+{% include './partial/header-script.html' %}
+<!-- 页面内加载的css -->
+<style>{% include '../lib/app/app.css' %}{% include '../lib/app-base.css' %}</style>
+<!-- 图标 -->
+<link rel="stylesheet" href="./lib/fontello/fontello.css">
+<!-- 字体 -->
+<link rel="stylesheet" href="./lib/reboto/roboto.css">
+<!-- 项目css -->
+<link rel="stylesheet" href="./css/app.css">
+<!-- 外部css块 -->
+{% block css %}{% endblock %}
+</head>
+<body>
+<div id="app" class="view-wrap"></div>
+<div id="loading" class="loading-wrap">
+    <div class="loading">
+        <div class="round"></div>
+        <div class="txt">0%</div>
+    </div>
+</div>
+<div id="freshing" class="fresh-wrap">
+    <div class="loading">
+        <div class="round"></div>
+        <p class="txt">loading...</p>
+    </div>
+</div>
+<!-- 内容填充块 -->
+{% autoescape false %}
+{% block content %}{% endblock %}
+{% endautoescape %}
+<!-- 页面内加载的尾部js -->
+{% include './partial/footer-script.html' %}
+<!-- 外部js块 -->
+{% block js %}{% endblock %}
+</body>
+</html>
