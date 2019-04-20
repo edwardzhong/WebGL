@@ -6,8 +6,8 @@
 </head>
 <body>
 <canvas id="canvas" width="500" height="500"></canvas>
-<script src="../js/webgl.js"></script>
-<script src="../js/matrix.js"></script>
+<script src="../../graphics/webgl-util.js"></script>
+<script src="../../graphics/matrix.js"></script>
 <script type="x-shader/x-vertex" id="vs">
 	attribute vec4 a_Position; //限定符，类型(4个浮点的矢量)，变量名称：顶点，attribute变量传输与顶点有关的数据，表示逐顶点的信息(顶点依次传递给它的意思) 
 	uniform mat4 u_xformMatrix; //4*4 浮点矩阵, uniform变量传输的是所有顶点都相同的数据(各顶点或片元共用的数据，比如矩阵变换), 可以是除了数组和结构体外的任意类型

@@ -6,8 +6,8 @@
 </head>
 <body>
 <canvas id="canvas" width="400" height="400"></canvas>
-<script src="../js/webgl.js"></script>
-<script src="../js/matrix.js"></script>
+<script src="../../graphics/webgl-util.js"></script>
+<script src="../../graphics/matrix.js"></script>
 <script type="x-shader/x-vertex" id="vs">
   attribute vec4 a_Position;
   attribute vec4 a_Color;
@@ -173,21 +173,60 @@
 			20,21,22,  20,22,23     // back
 		]);
 
-		var a_Position = gl.getAttribLocation(gl.program, 'a_Position');
-	    var a_Color = gl.getAttribLocation(gl.program, 'a_Color');
-	    var a_Normal = gl.getAttribLocation(gl.program, 'a_Normal');
-	    if (a_Position < 0 || a_Color < 0 || a_Normal < 0) {
-	        console.log('Failed to get the storage attribute location ');
-	        return 0;
-	    }
+			initArrayBuffer('a_Position',vertices,3,gl.FLOAT);
+			initArrayBuffer('a_Color',colors,3,gl.FLOAT);
+			initArrayBuffer('a_Normal',normals,3,gl.FLOAT);
 
-		initBuffer(gl,{data:vertices, num:3, type:gl.FLOAT },a_Position);
-		initBuffer(gl,{data:colors, num:3, type:gl.FLOAT },a_Color);
-		initBuffer(gl,{data:normals, num:3, type:gl.FLOAT },a_Normal);
-		initElementBuffer(gl,indices);
+			//创建顶点索引缓冲
+			if(!createBuffer(indices,gl.ELEMENT_ARRAY_BUFFER)){
+				console.log('Failed to create the buffer object');
+				return -1;
+			}
 		return indices.length;
 	}
+	/**
+	 * 创建缓冲区
+	 * @param  {Array} data
+	 * @param  {Object} bufferType
+	 * @return {Object}     
+	 */
+	 function createBuffer(data,bufferType){  
+	    // 生成缓存对象  
+	  var buffer = gl.createBuffer();  
+	  if (!buffer) {
+	    console.log('Failed to create the buffer object');
+	    return null;
+	  }
+	  // 绑定缓存(gl.ARRAY_BUFFER<顶点>||gl.ELEMENT_ARRAY_BUFFER<顶点索引>) 
+	  gl.bindBuffer(bufferType||gl.ARRAY_BUFFER, buffer);  
+	    
+	  // 向缓存中写入数据  
+	  gl.bufferData(bufferType||gl.ARRAY_BUFFER, data, gl.STATIC_DRAW);  
+	    
+	  // 将绑定的缓存设为无效  
+	  // gl.bindBuffer(gl.ARRAY_BUFFER, null);  
+	    
+	  // 返回生成的buffer  
+	  return buffer;
+	} 
 
+	function initArrayBuffer(attribute,data,num,type){
+  		// 创建顶点缓冲
+		if(!createBuffer(data)){
+		    console.log('Failed to create the buffer object');
+		    return false;
+		}
+
+		var a_attribute = gl.getAttribLocation(gl.program, attribute);
+		if (a_attribute < 0) {
+			console.log('Failed to get the storage location of ' + attribute);
+			return false;
+		}
+		// (地址,每个顶点分量的个数<1-4>,数据类型<整形，符点等>,是否归一化,指定相邻两个顶点间字节数<默认0>,指定缓冲区对象偏移字节数量<默认0>)
+		gl.vertexAttribPointer(a_attribute, num, type, false, 0, 0);
+		gl.enableVertexAttribArray(a_attribute);
+		return true;		
+	}
 	main();
 
 </script>
