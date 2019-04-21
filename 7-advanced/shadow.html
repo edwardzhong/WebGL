@@ -81,7 +81,7 @@ function main() {
     var planeBuffers = initBuffersForPlane(gl);
 
     // 初始化帧缓冲区对象 (FBO)  
-    var fbo = initFramebufferObject(gl);
+    var fbo = initFramebufferObject(gl,OFFSCREEN_WIDTH,OFFSCREEN_HEIGHT);
     if (!fbo) {
         console.log('Failed to initialize frame buffer object');
         return;
@@ -118,7 +118,7 @@ function main() {
         gl.viewport(0, 0, OFFSCREEN_HEIGHT, OFFSCREEN_HEIGHT); // Set view port for FBO
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT); // Clear FBO    
         /*
-            阴影着色器
+         * 阴影着色器
          */ 
         gl.useProgram(shadowProgram.program); // Set shaders for generating a shadow map
 
@@ -138,7 +138,7 @@ function main() {
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT); // Clear color and depth buffer
         
         /*
-            正常的着色器
+         *  正常的着色器
          */ 
         gl.useProgram(normalProgram.program); // Set the shader for regular drawing
         setUniforms(normalProgram,{

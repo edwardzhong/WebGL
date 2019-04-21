@@ -183,10 +183,10 @@ function main() {
     }
 
     // 初始化阴影着色器,创建对应program
-    var shadowProgram=createProgramInfo(gl,['svs','sfs']);
+    var shadowProgram = createProgramInfo(gl,['svs','sfs']);
 
     // 初始化普通着色器,创建对应program
-    var normalProgram=createProgramInfo(gl,['vs','fs']);
+    var normalProgram = createProgramInfo(gl,['vs','fs']);
 
     // 获取对应图形的缓冲区对象
     var planeBuffers = createBufferInfoFromArrays(gl,Plane());
@@ -194,7 +194,7 @@ function main() {
     // var cubeBuffers = createBufferInfoFromArrays(gl,Cube([1,0,0,1]));
 
     // 初始化帧缓冲区对象 (FBO)  
-    var fbo = initFramebufferObject(gl);
+    var fbo = initFramebufferObject(gl,2048,2048);
     if (!fbo) {
         console.log('Failed to initialize frame buffer object');
         return;
@@ -249,16 +249,12 @@ function main() {
         gl.viewport(0, 0, OFFSCREEN_WIDTH, OFFSCREEN_HEIGHT); // 设置帧绘图区域
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT); // Clear FBO    
         /*
-         *   阴影着色器
+         * 阴影着色器
          */ 
         gl.useProgram(shadowProgram.program);
         
-        // gl.enable(gl.CULL_FACE);
-        // gl.cullFace(gl.FRONT);
         // 绘制立方体
         drawCube(shadowProgram,viewProjMatrixFromLight);
-        // gl.cullFace(gl.BACK);
-        // gl.disable(gl.CULL_FACE);
                 
         // 绘制平面
         drawPlane(shadowProgram,viewProjMatrixFromLight);
@@ -270,7 +266,7 @@ function main() {
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
         
         /*
-         *  正常的着色器
+         * 正常的着色器
          */ 
         gl.useProgram(normalProgram.program);
 
@@ -336,14 +332,14 @@ function draw(gl, program, buffer,mvpMatrix) {
 }
 
 canvas.addEventListener('mousedown', function(e) {
-    START = WindowToCanvas(canvas, e.clientX, e.clientY);
+    START = windowToCanvas(canvas, e.clientX, e.clientY);
     canvas.addEventListener('mousemove', mouseMove, false);
     canvas.addEventListener('mouseup', mouseUp, false);
     canvas.addEventListener('mouseout', mouseUp, false);
 }, false);
 
 function mouseMove(e) {
-    var end = WindowToCanvas(canvas, e.clientX, e.clientY),
+    var end = windowToCanvas(canvas, e.clientX, e.clientY),
         a = Math.sqrt(Math.pow(START.x - CENTER.x, 2) + Math.pow(START.y - CENTER.y, 2)),
         b = Math.sqrt(Math.pow(end.x - CENTER.x, 2) + Math.pow(end.y - CENTER.y, 2)),
         radX = (START.x - end.x) * 0.01,

@@ -136,7 +136,7 @@
         // pcf 消除阴影边缘的锯齿
         float shadows =0.0;
         float opacity=0.3;// 阴影alpha值, 值越小暗度越深
-        float texelSize=1.0/1024.0;// 阴影像素尺寸,值越小阴影越逼真
+        float texelSize=1.0/2048.0;// 阴影像素尺寸,值越小阴影越逼真
         vec4 rgbaDepth;
 
         for(float y=-1.5; y <= 1.5; y += 1.0){
@@ -159,8 +159,8 @@
 
 var canvas = document.getElementById('canvas'),
     gl = get3DContext(canvas),
-    OFFSCREEN_WIDTH = 1024,
-    OFFSCREEN_HEIGHT = 1024,
+    OFFSCREEN_WIDTH = 2048,
+    OFFSCREEN_HEIGHT = 2048,
     viewAngleX=-10,
     viewAngleY=30,
     cViewAngleX=0,
@@ -191,7 +191,7 @@ function main() {
     var coneBuffers = createBufferInfoFromArrays(gl,Cone(1,4,40,[1,1,0,1]));
 
     // 初始化帧缓冲区对象 (FBO)  
-    var fbo = initFramebufferObject(gl);
+    var fbo = initFramebufferObject(gl,OFFSCREEN_WIDTH,OFFSCREEN_HEIGHT);
     if (!fbo) {
         console.log('Failed to initialize frame buffer object');
         return;
@@ -401,14 +401,14 @@ function draw(gl, program, buffer,mvpMatrix) {
 }
 
 canvas.addEventListener('mousedown', function(e) {
-    START = WindowToCanvas(canvas, e.clientX, e.clientY);
+    START = windowToCanvas(canvas, e.clientX, e.clientY);
     canvas.addEventListener('mousemove', mouseMove, false);
     canvas.addEventListener('mouseup', mouseUp, false);
     canvas.addEventListener('mouseout', mouseUp, false);
 }, false);
 
 function mouseMove(e) {
-    var end = WindowToCanvas(canvas, e.clientX, e.clientY),
+    var end = windowToCanvas(canvas, e.clientX, e.clientY),
         a = Math.sqrt(Math.pow(START.x - CENTER.x, 2) + Math.pow(START.y - CENTER.y, 2)),
         b = Math.sqrt(Math.pow(end.x - CENTER.x, 2) + Math.pow(end.y - CENTER.y, 2)),
         radX = (START.x - end.x) * 0.01,
