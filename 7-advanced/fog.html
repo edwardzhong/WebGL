@@ -112,7 +112,7 @@
 	            u_mvpMatrix: mvpMatrix.elements
 	        });
 			setBuffersAndAttributes(gl,program,buffer);
-		    gl.drawElements(gl.TRIANGLES, buffer.numElements, buffer.indexType, 0);
+		    gl.drawElements(gl.TRIANGLES, buffer.count, buffer.indexType, 0);
 
 	        requestAnimationFrame(animate);
 	    }());

@@ -2,10 +2,10 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>shadow mapping绘制阴影</title>
+<title>基本阴影</title>
 </head>
 <body>
-<canvas id="canvas" width="400" height="400"></canvas>
+<canvas id="canvas" width="600" height="600"></canvas>
 <script src="../../graphics/webgl-util.js"></script>
 <script src="../../graphics/matrix.js"></script>
 <script type="x-shader/x-vertex" id="svs">
@@ -43,14 +43,14 @@
     uniform sampler2D u_ShadowMap;
     varying vec4 v_PositionFromLight;
     varying vec4 v_color;
+
     void main() {
-        // 因为阴影纹理坐标和该坐标(光源处观察到的坐标),视点都是在光源处(使用的都是光源处的mvp矩阵);
-        // 所以使用该坐标计算出的就是纹理的坐标, 再通过纹理坐标就能找到光源处对应的z值
-        // xy将坐标区间从[-1,1]转为gl_FragCoord的区间[0,1],z是求出gl_FragCoord的深度值z(与后面的纹理z比较),刚好它们的求值方式都是一样
+        // 由光源处的坐标计算出纹理的坐标, 再通过纹理坐标就能找到光源处对应的z值
+        // xy分量是将坐标区间从[-1,1]转换为gl_FragCoord的区间[0,1],z分量则是求出gl_FragCoord的深度值z
         vec3 shadowCoord = (v_PositionFromLight.xyz/v_PositionFromLight.w)/2.0 + 0.5;
         //根据阴影xy坐标,获取纹理中对应的点,z值已经被之前的阴影着色器存放在该点的r分量中了,直接使用即可
-        vec4 rgbaDepth = texture2D(u_ShadowMap, shadowCoord.xy);// 获取指定纹理坐标处的像素颜色rgba
-        float visibility = (shadowCoord.z > rgbaDepth.r + 0.005) ? 0.6 : 1.0;//大于阴影的z轴,说明在阴影中并显示为阴影*0.6,否则为正常颜色*1.0
+        vec4 rgba = texture2D(u_ShadowMap, shadowCoord.xy);// 获取指定纹理坐标处的像素颜色rgba
+        float visibility = (shadowCoord.z > rgba.r + 0.005) ? 0.6 : 1.0;//大于阴影贴图中的z,说明在阴影中,否则为正常颜色
         gl_FragColor = vec4(v_color.rgb * visibility, v_color.a);
     }
 </script>
@@ -81,14 +81,11 @@ function main() {
     var planeBuffers = initBuffersForPlane(gl);
 
     // 初始化帧缓冲区对象 (FBO)  
-    var fbo = initFramebufferObject(gl,OFFSCREEN_WIDTH,OFFSCREEN_HEIGHT);
+    var fbo = createFramebuffer(gl,{w:OFFSCREEN_WIDTH,h:OFFSCREEN_HEIGHT});
     if (!fbo) {
         console.log('Failed to initialize frame buffer object');
         return;
     }
-
-    gl.activeTexture(gl.TEXTURE0); // Set a texture object to the texture unit
-    gl.bindTexture(gl.TEXTURE_2D, fbo.texture);
 
     // Set the clear color and enable the depth test
     gl.clearColor(0, 0, 0, 1);
@@ -174,7 +171,7 @@ function draw(gl, program, buffer, viewProjMatrix) {
         u_MvpMatrix: g_mvpMatrix.elements
     });
 
-    gl.drawElements(gl.TRIANGLES, buffer.numElements, buffer.indexType, 0);
+    gl.drawElements(gl.TRIANGLES, buffer.count, buffer.indexType, 0);
 }
 
 function initBuffersForPlane(gl) {
@@ -227,5 +224,4 @@ function initBuffersForTriangle(gl) {
 main();
 </script>
 </body>
-
 </html>

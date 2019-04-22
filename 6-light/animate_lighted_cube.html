@@ -2,9 +2,10 @@
 <html lang="en">
 <head>
 	<meta charset="UTF-8">
-	<title>光照加环境光立方体动画</title>
+	<title>平行光加环境光立方体动画</title>
 </head>
 <body>
+<h3>平行光加环境光立方体动画</h3>
 <canvas id="canvas" width="400" height="400"></canvas>
 <script src="../../graphics/webgl-util.js"></script>
 <script src="../../graphics/matrix.js"></script>
@@ -17,7 +18,8 @@
   uniform vec3 u_LightColor;
   uniform vec3 u_LightDirection;
   uniform vec3 u_AmbientLight;
-  varying vec4 v_Color;
+	varying vec4 v_Color;
+	
   void main() {
     gl_Position = u_MvpMatrix * a_Position;
      // 计算变换后的法向量归一化

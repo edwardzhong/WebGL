@@ -194,15 +194,11 @@ function main() {
     // var cubeBuffers = createBufferInfoFromArrays(gl,Cube([1,0,0,1]));
 
     // 初始化帧缓冲区对象 (FBO)  
-    var fbo = initFramebufferObject(gl,2048,2048);
+    var fbo = createFramebuffer(gl,{ w: OFFSCREEN_WIDTH, h: OFFSCREEN_HEIGHT });
     if (!fbo) {
         console.log('Failed to initialize frame buffer object');
         return;
     }
-
-    // 激活0号纹理单元,并将纹理对象绑定到该单元
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, fbo.texture);
 
     // 设置背景设并开启隐藏面消除功能 
     gl.clearColor(0, 0, 0, 1);
@@ -328,7 +324,7 @@ function draw(gl, program, buffer,mvpMatrix) {
     // 输出attribute对应的数据缓冲
     setBuffersAndAttributes(gl,program,buffer);
     setUniforms(program,{u_mvpMatrix: mvpMatrix.elements});
-    gl.drawElements(gl.TRIANGLES, buffer.numElements, buffer.indexType, 0);
+    gl.drawElements(gl.TRIANGLES, buffer.count, buffer.indexType, 0);
 }
 
 canvas.addEventListener('mousedown', function(e) {

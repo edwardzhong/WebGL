@@ -5,6 +5,7 @@
 	<title>立方体</title>
 </head>
 <body>
+<h3>逐片元立方体</h3>
 <canvas id="canvas" width="400" height="400"></canvas>
 <script src="../../graphics/webgl-util.js"></script>
 <script src="../../graphics/matrix.js"></script>
@@ -16,7 +17,7 @@
 	varying vec4 v_color;// 连接片元着色器
 	void main() { 
 		gl_Position = u_MvpMatrix * a_Position;
-		v_color=a_Color;//传递给片元着色器变量
+		v_color = a_Color;//传递给片元着色器变量
 	} 
 </script>
 <script type="x-shader/x-fragment" id="fs">

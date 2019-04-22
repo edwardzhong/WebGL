@@ -2,13 +2,13 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>阴影综合(多物体高精度pcf)</title>
+<title>阴影之多物体高精度pcf</title>
 <style>
     body{margin: 0;}
 </style>
 </head>
 <body>
-<canvas id="canvas" width="600" height="450"></canvas>
+<canvas id="canvas" width="1024" height="768"></canvas>
 <script src="../../graphics/webgl-util.js"></script>
 <script src="../../graphics/matrix.js"></script>
 <script src="../../graphics/util.js"></script>
@@ -22,7 +22,7 @@
 </script>
 <script type="x-shader/x-fragment" id="sfs">
     #ifdef GL_ES
-        precision highp float;
+        precision mediump float;
     #endif
     /**
      * 分解保存深度值
@@ -64,7 +64,7 @@
 </script>
 <script type="x-shader/x-fragment" id="fs">
     #ifdef GL_ES
-        precision highp float;
+        precision mediump float;
     #endif
     uniform vec3 u_lightColor;
     uniform vec3 u_lightPosition;
@@ -85,19 +85,24 @@
         return dot(rgbaDepth, bitShift);
     }
     void main() {
-        // 对法线归一化，因为其内插之后长度不一定是1
+        // 对法线归一化，因为内插之后长度不一定是1
         vec3 normal = normalize(v_normal);
-        // 计算光线方向
-        // 点光源(光源位置-顶点位置)并归一化
+        
+        /**
+        * 计算光线方向
+        */
+        // 点光源反向 光源位置-顶点位置
         vec3 lightDirection = normalize(u_lightPosition - v_position.xyz);
-        // 平行光源
+        // 平行光源反向
         // vec3 lightDirection = normalize(u_lightPosition);
-        // 计算光线方向和法向量点积(夹角的余弦值:90deg为与平面平行,0deg为与平面垂直)
+
+        // 光线方向和法向量的夹角，它们的点积即可求出夹角余弦值(范围0-90度)
         float cosTheta = max(dot(lightDirection, normal), 0.0);
 
-        // 计算漫反射亮度
+        // 漫反射亮度
         vec3 diffuse = u_lightColor * v_color.rgb * cosTheta;
-        // 计算环境光亮度
+        
+        // 环境光亮度
         vec3 ambient = u_ambientColor * v_color.rgb;
         
         /**
@@ -108,12 +113,12 @@
         vec3 viewDirection = normalize(u_viewPosition-v_position.xyz);// 反射方向
 
         // phong 冯氏模型 高光部分更加集中
-        vec3 reflectionDirection = reflect(-lightDirection, normal);
-        float specularWeighting = pow(max(dot(reflectionDirection, viewDirection), 0.0), shininess);
+        // vec3 reflectionDirection = reflect(-lightDirection, normal);
+        // float specularWeighting = pow(max(dot(reflectionDirection, viewDirection), 0.0), shininess);
 
-        // Blinn-Phong 宾氏模型 高光过渡更加自然
-        // vec3 halfwayDir = normalize(lightDirection + viewDirection);
-        // float specularWeighting = pow(max(dot(normal, halfwayDir), 0.0), shininess);
+        // Blinn-Phong 宾氏模型 高光过渡更自然
+        vec3 halfwayDir = normalize(lightDirection + viewDirection);
+        float specularWeighting = pow(max(dot(normal, halfwayDir), 0.0), shininess);
 
         // 计算镜面高光亮度
         vec3 specular = specularColor.rgb * specularWeighting;
@@ -121,34 +126,36 @@
         
         /**
          * 阴影部分
+         * 光源mvp矩阵乘顶点坐标计算出阴影纹理坐标(顶点着色器计算后插值传输过来)，再通过纹理坐标找到颜色，再由颜色值rgba分解出深度值z
          */
-        float bias = 0.005*tan(acos(cosTheta));// 根据光线与表面的夹角计算偏移量,用于消除马赫带
-        bias = clamp(bias, 0.0015,0.01);
-        // float bias = max(0.005 * (1.0 - dot(normal, lightDirection)), 0.0015);  
-        // 因为阴影纹理坐标和该坐标(光源处观察到的坐标),视点都是在光源处(使用的都是光源处的mvp矩阵);
-        // 所以使用该坐标计算出的就是纹理的坐标, 再通过纹理坐标就能找到光源处对应的z值
-        // xy将坐标区间从[-1,1]转为gl_FragCoord的区间[0,1],z是求出gl_FragCoord的深度值z(与后面的纹理z比较),刚好它们的求值方式都是一样
+        // 根据光线与表面的夹角计算偏移量,用于消除马赫带
+        float bias = 0.005 * tan(acos(cosTheta));
+        bias = clamp(bias, 0.0015, 0.01);
+         
+        // 下面表达式作用: 1.将xy分量坐标从齐次坐标区间[-1,1]转换为gl_FragCoord使用的区间[0,1]; 
+        // 2.z分量求出为图形每个像素在光源mvp矩阵下对应的深度值
         vec3 shadowCoord = (v_positionFromLight.xyz/v_positionFromLight.w)/2.0 + 0.5;
-        // vec4 rgbaDepth = texture2D(u_shadowMap, shadowCoord.xy);// 获取指定纹理坐标处的像素颜色rgba
-        // float depth = unpack(rgbaDepth); //将纹理颜色值(gl_fragColor)解析出阴影深度值z(光源视点)
-        // float visibility = (shadowCoord.z > depth + bias) ? 0.6 : 1.0;//大于阴影的z轴,说明在阴影中并显示为阴影*0.6,否则为正常颜色*1.0
 
-        // pcf 消除阴影边缘的锯齿
-        float shadows =0.0;
-        float opacity=0.3;// 阴影alpha值, 值越小暗度越深
-        float texelSize=1.0/2048.0;// 阴影像素尺寸,值越小阴影越逼真
+        // 无pcf方案
+        //vec4 rgbaDepth = texture2D(u_shadowMap, shadowCoord.xy);// 获取指定纹理坐标处的像素颜色rgba
+        //float depth = unpack(rgbaDepth); // 从纹理颜色值(rgba)解析出阴影深度值z
+        //float visibility = (shadowCoord.z > depth + bias) ? 0.5 : 1.0;//大于阴影贴图中的z值,说明在阴影中,否则为正常颜色
+        
+        // pcf方案 消除阴影边缘的锯齿
+        float shadows = 0.0;
+        float opacity = 0.4;// 基底阴影alpha值
+        float texelSize = 1.0/2048.0;// 阴影像素尺寸,值越小阴影越逼真
         vec4 rgbaDepth;
 
         for(float y=-1.5; y <= 1.5; y += 1.0){
             for(float x=-1.5; x <=1.5; x += 1.0){
-                rgbaDepth = texture2D(u_shadowMap, shadowCoord.xy+vec2(x,y)*texelSize);
-                shadows += shadowCoord.z-bias > unpack(rgbaDepth) ? 1.0 : 0.0;
+                rgbaDepth = texture2D(u_shadowMap, shadowCoord.xy + vec2(x,y) * texelSize);
+                shadows += shadowCoord.z - bias > unpack(rgbaDepth) ? 1.0 : 0.0;
             }
         }
-        shadows/=16.0;
-        float visibility=min(opacity+(1.0-shadows),1.0);
-        // visibility=visibility>0.8?1.0:visibility;
-        specular=visibility < 1.0 ? vec3(0.0,0.0,0.0): specular;// 阴影处没有高光
+        shadows /= 16.0;
+        float visibility = min(1.0 - shadows + opacity, 1.0);
+        specular = visibility < 1.0 ? vec3(0.0,0.0,0.0): specular;// 阴影处没有高光
         gl_FragColor = vec4((diffuse + ambient + specular) * visibility, v_color.a);
     }
 </script>
@@ -191,15 +198,11 @@ function main() {
     var coneBuffers = createBufferInfoFromArrays(gl,Cone(1,4,40,[1,1,0,1]));
 
     // 初始化帧缓冲区对象 (FBO)  
-    var fbo = initFramebufferObject(gl,OFFSCREEN_WIDTH,OFFSCREEN_HEIGHT);
+    var fbo = createFramebuffer(gl,{ w: OFFSCREEN_WIDTH, h: OFFSCREEN_HEIGHT });
     if (!fbo) {
         console.log('Failed to initialize frame buffer object');
         return;
     }
-
-    // 激活0号纹理单元,并将纹理对象绑定到该单元
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, fbo.texture);
 
     // 设置背景设并开启隐藏面消除功能 
     gl.clearColor(0, 0, 0, 1);
@@ -397,7 +400,7 @@ function draw(gl, program, buffer,mvpMatrix) {
     // 输出attribute对应的数据缓冲
     setBuffersAndAttributes(gl,program,buffer);
     setUniforms(program,{u_mvpMatrix: mvpMatrix.elements});
-    gl.drawElements(gl.TRIANGLES, buffer.numElements, buffer.indexType, 0);
+    gl.drawElements(gl.TRIANGLES, buffer.count, buffer.indexType, 0);
 }
 
 canvas.addEventListener('mousedown', function(e) {
