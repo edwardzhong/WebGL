@@ -84,6 +84,31 @@
         const vec4 bitShift = vec4(1.0, 1.0/256.0, 1.0/(256.0*256.0), 1.0/(256.0*256.0*256.0));
         return dot(rgbaDepth, bitShift);
     }
+    // pcf消除阴影边缘的锯齿
+    float pcf(float cosTheta,vec4 v_positionFromLight) {
+        float shadows = 0.0;
+        float opacity = 0.4;// 基底阴影alpha值
+        float texelSize = 1.0/2048.0;// 阴影像素尺寸,值越小阴影越逼真
+        vec4 rgbaDepth;
+        // 将xyz坐标从齐次坐标区间[-1,1]归一化为纹理使用的[0,1]，xy分量用于查找纹理颜色值rgba，z分量就是在光源坐标系下的深度值; 
+        vec3 shadowCoord = (v_positionFromLight.xyz/v_positionFromLight.w)/2.0 + 0.5;
+        // 根据光线与表面的夹角计算偏移量,用于消除马赫带
+        float bias = 0.005 * tan(acos(cosTheta));
+        bias = clamp(bias, 0.0015, 0.01);
+
+        for(float y=-1.5; y <= 1.5; y += 1.0){
+            for(float x=-1.5; x <=1.5; x += 1.0){
+                rgbaDepth = texture2D(u_shadowMap, shadowCoord.xy + vec2(x,y) * texelSize);
+                shadows += step(shadowCoord.z - bias, unpack(rgbaDepth));
+            }
+        }
+        shadows /= 16.0;
+        return min(opacity + shadows, 1.0);
+        //不使用pcf的方案
+        //vec4 rgbaDepth = texture2D(u_shadowMap, shadowCoord.xy);// 获取指定纹理坐标处的像素颜色rgba
+        //float depth = unpack(rgbaDepth); // 从纹理颜色值(rgba)解析出阴影深度值z
+        //float visibility = (shadowCoord.z > depth + bias) ? 0.5 : 1.0;//大于阴影贴图中的z值,说明在阴影中
+    }
     void main() {
         // 对法线归一化，因为内插之后长度不一定是1
         vec3 normal = normalize(v_normal);
@@ -92,9 +117,9 @@
         * 计算光线方向
         */
         // 点光源反向 光源位置-顶点位置
-        // vec3 lightDirection = normalize(u_lightPosition - v_position.xyz);
+        vec3 lightDirection = normalize(u_lightPosition - v_position.xyz);
         // 平行光源反向
-        vec3 lightDirection = normalize(u_lightPosition);
+        // vec3 lightDirection = normalize(u_lightPosition);
 
         // 光线方向和法向量的夹角，它们的点积即可求出夹角余弦值(范围0-90度)
         float cosTheta = max(dot(lightDirection, normal), 0.0);
@@ -108,53 +133,25 @@
         /**
          * 高光部分
          */
-        float shininess =10.0;
+        float shininess =50.0;
         vec3 specularColor = vec3(1.0,1.0,1.0);//镜面反射光颜色
         vec3 viewDirection = normalize(u_viewPosition-v_position.xyz);// 反射方向
 
-        // phong 冯氏模型 高光部分更加集中
-        vec3 reflectionDirection = normalize(reflect(-lightDirection, normal));
-        float specularWeighting = pow(max(dot(reflectionDirection, viewDirection), 0.0), shininess);
+        // phong 模型 高光部分更加集中
+        // vec3 reflectionDirection = normalize(reflect(-lightDirection, normal));
+        // float specularWeighting = pow(max(dot(reflectionDirection, viewDirection), 0.0), shininess);
 
-        // Blinn-Phong 宾氏模型 高光过渡更自然
-        //vec3 halfwayDir = normalize(lightDirection + viewDirection);
-        //float specularWeighting = pow(max(dot(normal, halfwayDir), 0.0), shininess);
+        // Blinn-Phong 模型 高光过渡更自然
+        vec3 halfwayDir = normalize(lightDirection + viewDirection);
+        float specularWeighting = pow(max(dot(normal, halfwayDir), 0.0), shininess);
 
         // 计算镜面高光亮度
         vec3 specular = specularColor.rgb * specularWeighting;
-        // gl_FragColor = vec4((spotLight + ambient + specular), v_color.a);
         
-        /**
-         * 阴影部分
-         * 通过光源坐标系下的位置找出阴影纹理的颜色值，再由颜色值rgba分解出深度值z
-         */
-        // 根据光线与表面的夹角计算偏移量,用于消除马赫带
-        float bias = 0.005 * tan(acos(cosTheta));
-        bias = clamp(bias, 0.0015, 0.01);
-         
-        // 将xyz坐标从齐次坐标区间[-1,1]归一化为纹理使用的[0,1]，xy分量用于查找纹理颜色值rgba，z分量就是在光源坐标系下的深度值; 
-        vec3 shadowCoord = (v_positionFromLight.xyz/v_positionFromLight.w)/2.0 + 0.5;
-
-        // 无pcf方案
-        //vec4 rgbaDepth = texture2D(u_shadowMap, shadowCoord.xy);// 获取指定纹理坐标处的像素颜色rgba
-        //float depth = unpack(rgbaDepth); // 从纹理颜色值(rgba)解析出阴影深度值z
-        //float visibility = (shadowCoord.z > depth + bias) ? 0.5 : 1.0;//大于阴影贴图中的z值,说明在阴影中
+        // pcf 通过光源坐标系下的位置找出阴影纹理的颜色值，再由颜色值rgba分解出深度值z
+        float visibility = pcf(cosTheta,v_positionFromLight);
         
-        // pcf方案 消除阴影边缘的锯齿
-        float shadows = 0.0;
-        float opacity = 0.4;// 基底阴影alpha值
-        float texelSize = 1.0/2048.0;// 阴影像素尺寸,值越小阴影越逼真
-        vec4 rgbaDepth;
-
-        for(float y=-1.5; y <= 1.5; y += 1.0){
-            for(float x=-1.5; x <=1.5; x += 1.0){
-                rgbaDepth = texture2D(u_shadowMap, shadowCoord.xy + vec2(x,y) * texelSize);
-                shadows += shadowCoord.z - bias > unpack(rgbaDepth) ? 1.0 : 0.0;
-            }
-        }
-        shadows /= 16.0;
-        float visibility = min(1.0 - shadows + opacity, 1.0);
-        specular = visibility < 1.0 ? vec3(0.0,0.0,0.0): specular;// 阴影处没有高光
+        specular *= step(visibility,1.0);// 阴影处没有高光
         gl_FragColor = vec4((diffuse + ambient + specular) * visibility, v_color.a);
     }
 </script>
@@ -191,10 +188,10 @@ function main() {
 
     // 获取对应图形的缓冲区对象
     var planeBuffers = createBufferInfoFromArrays(gl,Plane());
-    var cubeBuffers = createBufferInfoFromArrays(gl,Cube([1,0.2,0,1]));
-    var sphereBuffers = createBufferInfoFromArrays(gl,Sphere(50,[0.2,1,0,1]));
-    var cylinderBuffers = createBufferInfoFromArrays(gl,Cylinder(0.8,4,40,[0,0.3,1,1]));
-    var coneBuffers = createBufferInfoFromArrays(gl,Cone(1,4,40,[1,1,0,1]));
+    var cubeBuffers = createBufferInfoFromArrays(gl,Cube([0.8,0.1,0.3,1]));
+    var sphereBuffers = createBufferInfoFromArrays(gl,Sphere(50,[0.2,0.8,0.2,1]));
+    var cylinderBuffers = createBufferInfoFromArrays(gl,Cylinder(0.8,4,40,[0.2,0.2,0.8,1]));
+    var coneBuffers = createBufferInfoFromArrays(gl,Cone(1,4,40,[0.9,0.9,0.1,1]));
 
     // 初始化帧缓冲区对象 (FBO)  
     var fbo = createFramebuffer(gl,{ w: OFFSCREEN_WIDTH, h: OFFSCREEN_HEIGHT });
@@ -245,33 +242,26 @@ function main() {
 
         viewProjMatrix.setPerspective(30, canvas.width / canvas.height, 1.0, 100.0);
         viewProjMatrix.lookAt(eyeX,eyeY,eyeZ, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0);
+
         gl.bindFramebuffer(gl.FRAMEBUFFER, fbo); // 切换绘制场景为帧缓冲区  
         gl.viewport(0, 0, OFFSCREEN_HEIGHT, OFFSCREEN_HEIGHT); // 设置帧绘图区域
-        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT); // Clear FBO    
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT); // 清空颜色缓冲和深度缓冲
         /*
-         *   阴影着色器
+         * 阴影着色器
          */ 
-        gl.useProgram(shadowProgram.program);
-        
-        // gl.enable(gl.CULL_FACE);
-        // gl.cullFace(gl.FRONT);
+        gl.useProgram(shadowProgram.program);    
         // 绘制物体
         drawCone(shadowProgram,viewProjMatrixFromLight);
         drawCylinder(shadowProgram,viewProjMatrixFromLight);
         drawSphere(shadowProgram,viewProjMatrixFromLight);
         drawCube(shadowProgram,viewProjMatrixFromLight);
-        // gl.cullFace(gl.BACK);
-        // gl.disable(gl.CULL_FACE);
-                
         // 绘制平面
         drawPlane(shadowProgram,viewProjMatrixFromLight);
         
-        // 将帧缓冲区切换为正常的缓冲区
-        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);//解除绑定帧缓冲区，即切换为正常的缓冲区
         gl.viewport(0, 0, canvas.width, canvas.height);//设置绘图区域
-         // 清屏和深度缓冲
-        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-        
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);// 清空颜色缓冲和深度缓冲
         /*
          *  正常的着色器
          */ 

@@ -80,80 +80,70 @@
         const vec4 bitShift = vec4(1.0, 1.0/256.0, 1.0/(256.0*256.0), 1.0/(256.0*256.0*256.0));
         return dot(rgbaDepth, bitShift);
     }
+    // pcf消除阴影边缘的锯齿
+    float pcf(float cosTheta,vec4 v_positionFromLight) {
+        float shadows = 0.0;
+        float opacity = 0.4;// 基底阴影alpha值
+        float texelSize = 1.0/2048.0;// 阴影像素尺寸,值越小阴影越逼真
+        vec4 rgbaDepth;
+        // 将xyz坐标从齐次坐标区间[-1,1]归一化为纹理使用的[0,1]，xy分量用于查找纹理颜色值rgba，z分量就是在光源坐标系下的深度值; 
+        vec3 shadowCoord = (v_positionFromLight.xyz/v_positionFromLight.w)/2.0 + 0.5;
+        // 根据光线与表面的夹角计算偏移量,用于消除马赫带
+        float bias = 0.005 * tan(acos(cosTheta));
+        bias = clamp(bias, 0.0015, 0.01);
+
+        for(float y=-1.5; y <= 1.5; y += 1.0){
+            for(float x=-1.5; x <=1.5; x += 1.0){
+                rgbaDepth = texture2D(u_shadowMap, shadowCoord.xy + vec2(x,y) * texelSize);
+                shadows += step(shadowCoord.z - bias, unpack(rgbaDepth));
+            }
+        }
+        shadows /= 16.0;
+        return min(opacity + shadows, 1.0);
+    }
     void main() {
         // 对法线归一化，因为其内插之后长度不一定是1
         vec3 normal = normalize(v_normal);
-        // 计算光线方向
-        // 点光源(光源位置-顶点位置)并归一化
+        // 点光源反向 光源位置-顶点位置
         vec3 lightDirection = normalize(u_lightPosition - v_position.xyz);
-        // 平行光源
-        // vec3 lightDirection = normalize(u_lightPosition);
-        // 计算光线方向和法向量点积(夹角的余弦值:90deg为与平面平行,0deg为与平面垂直)
+        // 光线方向和法向量的夹角，它们的点积即可求出夹角余弦值(范围0-90度)
         float cosTheta = max(dot(lightDirection, normal), 0.0);
-
-        // 计算漫反射亮度
-        vec3 diffuse = u_lightColor * v_color.rgb * cosTheta;
-        // 计算环境光亮度
-        vec3 ambient = u_ambientColor * v_color.rgb * cosTheta;
         
-        /**
-         * 高光部分
-         */
-        float shininess =10.0;
-        vec3 specularColor =vec3(1.0,1.0,1.0);//镜面反射光颜色
-        vec3 viewDirection = normalize(u_viewPosition-v_position.xyz);// 反射方向
-        
-        // phong 冯氏模型 高光部分更加集中
-        // vec3 reflectionDirection = reflect(-lightDirection, normal);
-        // float specularWeighting = pow(max(dot(reflectionDirection, viewDirection), 0.0), shininess);
-
-        // Blinn-Phong 宾氏模型 高光过渡更加自然
-        vec3 halfwayDir = normalize(lightDirection + viewDirection);
-        // float specularWeighting = pow(max(dot(normal, halfwayDir), 0.0), shininess);
-
-        //聚光灯部分
-        //灯光照射方向是指向坐标原点(0,0,o),可指定照射角度(degX,degY)或者照射坐标
-        float limit=cos(radians(25.0));//角度余弦值
+        /*
+        * 聚光灯
+        */
+        //默认照射方向是坐标原点(0,0,0),可通过指定照射角度(degX,degY,degZ)或者 照射坐标(x,y,z) 设置朝向
+        float limit = cos(radians(25.0)) * cosTheta;//照射范围角度 * 背面消除
         //outerLimit和innerLimit之间的光线模糊效果
-        float outerLimit=cos(radians(25.0));
-        float innerLimit=cos(radians(20.0));
-        float specularWeighting = 0.0;
-        vec3 spotLight= vec3(0.0,0.0,0.0);
-        vec3 lightPosition =normalize(u_lightPosition);
+        float outerLimit = cos(radians(25.0));//模糊外径角度
+        float innerLimit = cos(radians(20.0));//模糊内径角度
+        vec3 lightPosition = normalize(u_lightPosition);
         float dotFromDirection = dot(lightDirection,lightPosition);
-        float inLight = smoothstep(outerLimit, innerLimit, dotFromDirection);
+        float blurRange = smoothstep(outerLimit, innerLimit, dotFromDirection);//模糊范围
 
-        /**
-         * 阴影部分
-         */
-        float bias = 0.005*tan(acos(cosTheta));
-        bias = clamp(bias, 0.0015,0.005);
-        vec3 shadowCoord = (v_positionFromLight.xyz/v_positionFromLight.w)/2.0 + 0.5;
-        float visibility=1.0;
-        float shadow =0.0;
-        float opacity=0.6;
-        float texelSize=1.0/2048.0;
-        vec4 rgbaDepth;
+        float shininess = 50.0;
+        vec3 specularColor = vec3(1.0,1.0,1.0);//镜面反射光颜色
+        float specularWeighting = 0.0;
+        vec3 diffuse = vec3(0.0,0.0,0.0);
+        float visibility = 1.0;
 
-        if (dotFromDirection >= limit) {//处于光照范围之内
+        //计算光照范围内效果
+        if (dotFromDirection >= limit) {
             // 漫反射
-            spotLight=u_lightColor * v_color.rgb * inLight * cosTheta;
+            diffuse = u_lightColor * v_color.rgb * blurRange * cosTheta;
             // 高光
+            vec3 viewDirection = normalize(u_viewPosition-v_position.xyz);// 反射方向
+            vec3 halfwayDir = normalize(lightDirection + viewDirection);
             specularWeighting = pow(max(dot(normal, halfwayDir), 0.0), shininess);
-            // pcf
-            for(float y=-1.5; y <= 1.5; y += 1.0){
-                for(float x=-1.5; x <=1.5; x += 1.0){
-                    rgbaDepth = texture2D(u_shadowMap, shadowCoord.xy+vec2(x,y)*texelSize);
-                    shadow += shadowCoord.z-bias > unpack(rgbaDepth)?1.0:0.0;
-                }
-            }  
-            shadow/=16.0;
-            visibility=min(opacity+(1.0-shadow),1.0);
+            //阴影
+            visibility = pcf(cosTheta,v_positionFromLight);
         }
-
-        // 计算镜面高光亮度
-        vec3 specular = specularColor.rgb * specularWeighting;
-        gl_FragColor = vec4((spotLight + ambient + specular) * visibility, v_color.a);        
+        
+        // 环境光亮度
+        vec3 ambient = u_ambientColor * v_color.rgb;
+        // 镜面高光亮度
+        vec3 specular = specularColor.rgb * specularWeighting * blurRange;
+        gl_FragColor = vec4((diffuse + ambient + specular) * visibility, v_color.a);        
     }
 </script>
 <script>
@@ -165,14 +155,13 @@ var canvas = document.getElementById('canvas'),
     gl = get3DContext(canvas),
     OFFSCREEN_WIDTH = 2048,
     OFFSCREEN_HEIGHT = 2048,
-    viewAngleX=0,
-    viewAngleY=30,
+    viewAngleX=15,
+    viewAngleY=15,
     cViewAngleX=0,
     cViewAngleY=0,
     viewLEN=12,
     LENPERCENT = 1,
-    LIGHT_POS=[2,2,6],//光源位置
-    VIEW_POS=[-2,6,8],//视点位置
+    LIGHT_POS=[3,2.5,6],//光源位置
     CENTER = { x: canvas.width / 2, y: canvas.height / 2 },
     START = {};
 
@@ -190,7 +179,7 @@ function main() {
 
     // 获取对应图形的缓冲区对象
     var planeBuffers = createBufferInfoFromArrays(gl,Plane());
-    var cubeBuffers = createBufferInfoFromArrays(gl,Cube([1,0,0,1]));
+    var cubeBuffers = createBufferInfoFromArrays(gl,Cube([0.8,0.2,0.3,1]));
     // var cubeBuffers = createBufferInfoFromArrays(gl,Cube([1,0,0,1]));
 
     // 初始化帧缓冲区对象 (FBO)  
