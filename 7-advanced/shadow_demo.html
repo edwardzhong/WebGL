@@ -28,18 +28,18 @@
      * 分解保存深度值
      */
     vec4 pack (float depth) {
-        // 当光源与照射物间距离变远,z值会增大,而1个分量的8位已经不够存储深度值,所以扩充使用4个分量共32位进行存储
-        // 使用rgba 4字节共32位来存储z值,1个字节精度为1/256
+        // 当光源与照射物间距离变远,z值会增大,而1个分量的8位已经不够存储深度值,所以使用4个分量(rgba) 4字节共32位来存储z值,1个字节8位精度为1/256
+        // gl_FragCoord:片元的坐标,fract():返回数值的小数部分
         const vec4 bitShift = vec4(1.0, 256.0, 256.0 * 256.0, 256.0 * 256.0 * 256.0);
         const vec4 bitMask = vec4(1.0/256.0, 1.0/256.0, 1.0/256.0, 0.0);
-        // gl_FragCoord:片元的坐标,fract():返回数值的小数部分
         vec4 rgbaDepth = fract(depth * bitShift); //计算每个点的z值 
-        rgbaDepth -= rgbaDepth.gbaa * bitMask; // Cut off the value which do not fit in 8 bits
+        rgbaDepth -= rgbaDepth.gbaa * bitMask; // 清除多余的部分
         return rgbaDepth;
     }
-    //该片元着色器目的是计算每个片元的深度值z,并把z值保存到gl_FragColor中,可以把该纹理看成是深度值z的容器,因为它并不会渲染出来
+    // gl_FragCoord是片元在屏幕下的坐标，即只能是图形可视范围的片元
+    // 将深度值z分段存储到rgba分量, 接着rgba会绘制到帧缓冲颜色关联对象中的纹理对象，在这里帧缓冲对象只是用于保存数据，它是离屏渲染，不会绘制到屏幕
     void main() {
-        gl_FragColor = pack(gl_FragCoord.z);// 将z值分开存储到rgba分量中,阴影颜色的同时也是深度值z
+        gl_FragColor = pack(gl_FragCoord.z);
     }
 </script>
 <script type="x-shader/x-vertex" id="vs">
@@ -56,7 +56,7 @@
     varying vec4 v_color;
     void main() {
         gl_Position = u_mvpMatrix * a_position; // 当前视点观察到的坐标
-        v_positionFromLight = u_mvpMatrixFromLight * a_position;//光源处观察到的坐标,用于后续分解出z值
+        v_positionFromLight = u_mvpMatrixFromLight * a_position;//光源坐标系下的位置,传给片元着色器，xy用于查找阴影纹理颜色，z是之后用于比较的深度值
         v_position = vec3(u_modelMatrix * a_position);
         v_normal = normalize(vec3(u_normalMatrix * a_normal));
         v_color = a_color;
@@ -92,9 +92,9 @@
         * 计算光线方向
         */
         // 点光源反向 光源位置-顶点位置
-        vec3 lightDirection = normalize(u_lightPosition - v_position.xyz);
+        // vec3 lightDirection = normalize(u_lightPosition - v_position.xyz);
         // 平行光源反向
-        // vec3 lightDirection = normalize(u_lightPosition);
+        vec3 lightDirection = normalize(u_lightPosition);
 
         // 光线方向和法向量的夹角，它们的点积即可求出夹角余弦值(范围0-90度)
         float cosTheta = max(dot(lightDirection, normal), 0.0);
@@ -109,16 +109,16 @@
          * 高光部分
          */
         float shininess =10.0;
-        vec3 specularColor =vec3(1.0,1.0,1.0);//镜面反射光颜色
+        vec3 specularColor = vec3(1.0,1.0,1.0);//镜面反射光颜色
         vec3 viewDirection = normalize(u_viewPosition-v_position.xyz);// 反射方向
 
         // phong 冯氏模型 高光部分更加集中
-        // vec3 reflectionDirection = reflect(-lightDirection, normal);
-        // float specularWeighting = pow(max(dot(reflectionDirection, viewDirection), 0.0), shininess);
+        vec3 reflectionDirection = normalize(reflect(-lightDirection, normal));
+        float specularWeighting = pow(max(dot(reflectionDirection, viewDirection), 0.0), shininess);
 
         // Blinn-Phong 宾氏模型 高光过渡更自然
-        vec3 halfwayDir = normalize(lightDirection + viewDirection);
-        float specularWeighting = pow(max(dot(normal, halfwayDir), 0.0), shininess);
+        //vec3 halfwayDir = normalize(lightDirection + viewDirection);
+        //float specularWeighting = pow(max(dot(normal, halfwayDir), 0.0), shininess);
 
         // 计算镜面高光亮度
         vec3 specular = specularColor.rgb * specularWeighting;
@@ -126,20 +126,19 @@
         
         /**
          * 阴影部分
-         * 光源mvp矩阵乘顶点坐标计算出阴影纹理坐标(顶点着色器计算后插值传输过来)，再通过纹理坐标找到颜色，再由颜色值rgba分解出深度值z
+         * 通过光源坐标系下的位置找出阴影纹理的颜色值，再由颜色值rgba分解出深度值z
          */
         // 根据光线与表面的夹角计算偏移量,用于消除马赫带
         float bias = 0.005 * tan(acos(cosTheta));
         bias = clamp(bias, 0.0015, 0.01);
          
-        // 下面表达式作用: 1.将xy分量坐标从齐次坐标区间[-1,1]转换为gl_FragCoord使用的区间[0,1]; 
-        // 2.z分量求出为图形每个像素在光源mvp矩阵下对应的深度值
+        // 将xyz坐标从齐次坐标区间[-1,1]归一化为纹理使用的[0,1]，xy分量用于查找纹理颜色值rgba，z分量就是在光源坐标系下的深度值; 
         vec3 shadowCoord = (v_positionFromLight.xyz/v_positionFromLight.w)/2.0 + 0.5;
 
         // 无pcf方案
         //vec4 rgbaDepth = texture2D(u_shadowMap, shadowCoord.xy);// 获取指定纹理坐标处的像素颜色rgba
         //float depth = unpack(rgbaDepth); // 从纹理颜色值(rgba)解析出阴影深度值z
-        //float visibility = (shadowCoord.z > depth + bias) ? 0.5 : 1.0;//大于阴影贴图中的z值,说明在阴影中,否则为正常颜色
+        //float visibility = (shadowCoord.z > depth + bias) ? 0.5 : 1.0;//大于阴影贴图中的z值,说明在阴影中
         
         // pcf方案 消除阴影边缘的锯齿
         float shadows = 0.0;
