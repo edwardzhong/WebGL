@@ -53,7 +53,7 @@
     void main() {
         gl_Position = u_mvpMatrix * a_position; // 当前视点观察到的坐标
         v_positionFromLight = u_mvpMatrixFromLight * a_position;//光源处观察到的坐标,用于后续分解出z值
-        v_position = vec3(u_modelMatrix * a_position);
+        v_position = vec3(u_modelMatrix * a_position);//顶点在世界坐标系中的位置
         v_normal = normalize(vec3(u_normalMatrix * a_normal));
         v_color = a_color;
     }
