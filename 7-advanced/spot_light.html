@@ -5,9 +5,34 @@
 <title>点光源聚光灯阴影</title>
 <style>
     body{margin: 0;}
+    h3{
+        padding-left: 10px;
+    }
+    label{
+        display: inline-block;
+        width: 60px;
+        padding: 0 10px;
+    }
 </style>
 </head>
 <body>
+<h3>聚光灯位置和角度</h3>
+<label for="x">x坐标</label>
+<input type="range" name="x" id="x" step="0.5" min="-5" max="5" value="0">
+<span id="xt">0</span>
+<br>
+<label for="y">y坐标</label>
+<input type="range" name="y" id="y" step="0.5" min="0" max="10" value="3">
+<span id="yt">3</span>
+<br>
+<label for="xan">x轴角度</label>
+<input type="range" name="xan" id="xan" step="1" min="0" max="45" value="0">
+<span id="xat">0</span>
+<br>
+<label for="yan">y轴角度</label>
+<input type="range" name="yan" id="yan" step="1" min="-45" max="45" value="0">
+<span id="yat">30</span>
+<br>
 <canvas id="canvas" width="600" height="450"></canvas>
 <script src="../../graphics/webgl-util.js"></script>
 <script src="../../graphics/matrix.js"></script>
@@ -64,6 +89,7 @@
     #endif
     uniform vec3 u_lightColor;
     uniform vec3 u_lightPosition;
+    uniform vec3 u_lightDirection;
     uniform vec3 u_ambientColor;
     uniform vec3 u_viewPosition;
     uniform sampler2D u_shadowMap;
@@ -105,9 +131,9 @@
         // 对法线归一化，因为其内插之后长度不一定是1
         vec3 normal = normalize(v_normal);
         // 点光源反向 光源位置-顶点位置
-        vec3 lightDirection = normalize(u_lightPosition - v_position.xyz);
+        vec3 surfaceToLightDirection = normalize(u_lightPosition - v_position);
         // 光线方向和法向量的夹角，它们的点积即可求出夹角余弦值(范围0-90度)
-        float cosTheta = max(dot(lightDirection, normal), 0.0);
+        float cosTheta = max(dot(surfaceToLightDirection, normal), 0.0);
         
         /*
         * 聚光灯
@@ -117,8 +143,7 @@
         //outerLimit和innerLimit之间的光线模糊效果
         float outerLimit = cos(radians(25.0));//模糊外径角度
         float innerLimit = cos(radians(20.0));//模糊内径角度
-        vec3 lightPosition = normalize(u_lightPosition);
-        float dotFromDirection = dot(lightDirection,lightPosition);
+        float dotFromDirection = dot(surfaceToLightDirection, u_lightDirection);//光源方向与表面光线方向的夹角
         float blurRange = smoothstep(outerLimit, innerLimit, dotFromDirection);//模糊范围
 
         float shininess = 50.0;
@@ -128,15 +153,15 @@
         float visibility = 1.0;
 
         //计算光照范围内效果
-        if (dotFromDirection >= limit) {
+        if (dotFromDirection > limit) {
             // 漫反射
             diffuse = u_lightColor * v_color.rgb * blurRange * cosTheta;
             // 高光
-            vec3 viewDirection = normalize(u_viewPosition-v_position.xyz);// 反射方向
-            vec3 halfwayDir = normalize(lightDirection + viewDirection);
+            vec3 viewDirection = normalize(u_viewPosition-v_position);// 反射方向
+            vec3 halfwayDir = normalize(surfaceToLightDirection + viewDirection);
             specularWeighting = pow(max(dot(normal, halfwayDir), 0.0), shininess);
             //阴影
-            visibility = pcf(cosTheta,v_positionFromLight);
+            visibility = pcf(cosTheta,v_positionFromLight) * blurRange;// (..* blurRange)聚光灯范围外没有阴影
         }
         
         // 环境光亮度
@@ -152,18 +177,58 @@
 // 从光源的角度将场景的深度渲染到一张深度缓冲区中，我们可以在场景中获得一张阴影或者无阴影的贴图.
 
 var canvas = document.getElementById('canvas'),
-    gl = get3DContext(canvas),
-    OFFSCREEN_WIDTH = 2048,
-    OFFSCREEN_HEIGHT = 2048,
-    viewAngleX=15,
+    gl = get3DContext(canvas,true),
+    FBO_WIDTH = 2048,
+    FBO_HEIGHT = 2048,
+    viewAngleX=0,
     viewAngleY=15,
     cViewAngleX=0,
     cViewAngleY=0,
     viewLEN=12,
     LENPERCENT = 1,
-    LIGHT_POS=[3,2.5,6],//光源位置
+    LIGHT_POS=[0,3,6],//光源位置
+    LIGHT_DIR=[0,3,6],
     CENTER = { x: canvas.width / 2, y: canvas.height / 2 },
     START = {};
+
+var xEle = document.getElementById('x'),
+    yEle = document.getElementById('y'),
+    xaEle = document.getElementById('xan'),
+    yaEle = document.getElementById('yan'),
+    xt = document.getElementById('xt'),
+    yt = document.getElementById('yt'),
+    xat = document.getElementById('xat'),
+    yat = document.getElementById('yat'),
+    xdeg = 0,
+    ydeg = 0;
+
+xEle.oninput = function(e){
+    xt.innerText = LIGHT_POS[0] = Number(this.value);
+     
+}   
+
+yEle.oninput = function(e){
+    yt.innerText = LIGHT_POS[1] = Number(this.value);
+}
+
+xaEle.oninput = function(e){
+    xat.innerText = xdeg = Number(this.value);
+    caculateDir();
+}
+
+yaEle.oninput = function(e){
+    yat.innerText = ydeg = Number(this.value);
+    caculateDir();
+}
+
+//计算光源方向
+function caculateDir(){
+    var mat = new Matrix4();
+    mat.setRotate(-xdeg,1,0,0);
+    mat.rotate(-ydeg,0,1,0);
+    LIGHT_DIR = mat.multiplyVector3(new Vector3(LIGHT_POS)).normalize().elements;
+    console.log(LIGHT_DIR);
+}
 
 function main() {
     if (!gl) {
@@ -183,22 +248,20 @@ function main() {
     // var cubeBuffers = createBufferInfoFromArrays(gl,Cube([1,0,0,1]));
 
     // 初始化帧缓冲区对象 (FBO)  
-    var fbo = createFramebuffer(gl,{ w: OFFSCREEN_WIDTH, h: OFFSCREEN_HEIGHT });
+    var fbo = createFramebuffer(gl,{ w: FBO_WIDTH, h: FBO_HEIGHT });
     if (!fbo) {
         console.log('Failed to initialize frame buffer object');
         return;
     }
 
-    // 设置背景设并开启隐藏面消除功能 
+    // 设置背景
     gl.clearColor(0, 0, 0, 1);
+    // 开启深度测试
     gl.enable(gl.DEPTH_TEST);
-    // gl.polygonOffset(1.0, 1.0)
+    // 剔除面
     // gl.enable(gl.CULL_FACE);
-    // gl.cullFace(gl.BACK);
     
     var viewProjMatrixFromLight = new Matrix4(); // 光源处观察的视图投影矩阵(阴影着色器)
-    viewProjMatrixFromLight.setPerspective(90, OFFSCREEN_WIDTH / OFFSCREEN_HEIGHT, 1.0, 100.0);
-    viewProjMatrixFromLight.lookAt(...LIGHT_POS, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0);
 
     var viewProjMatrix = new Matrix4(); // 当前视点观测的视图投影矩阵(正常着色器)
     var mvpMatrixFromLight_s = new Matrix4(); // 从光源处观察圆球的mvp矩阵(正常着色器)
@@ -228,41 +291,38 @@ function main() {
             eyeX=c*Math.sin(angleX*Math.PI/180),
             eyeZ=c*Math.cos(angleX*Math.PI/180);
 
-        viewProjMatrix.setPerspective(35, canvas.width / canvas.height, 1.0, 100.0);
+        viewProjMatrixFromLight.setPerspective(90, FBO_WIDTH / FBO_HEIGHT, 1, 100.0);
+        viewProjMatrixFromLight.lookAt(...LIGHT_POS, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0);
+        viewProjMatrix.setPerspective(35, canvas.width / canvas.height, 1, 100.0);
         viewProjMatrix.lookAt(eyeX,eyeY,eyeZ, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0);
-        gl.bindFramebuffer(gl.FRAMEBUFFER, fbo); // 切换绘制场景为帧缓冲区  
-        gl.viewport(0, 0, OFFSCREEN_WIDTH, OFFSCREEN_HEIGHT); // 设置帧绘图区域
-        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT); // Clear FBO    
+
         /*
-         * 阴影着色器
+         * 帧缓存
          */ 
+        gl.bindFramebuffer(gl.FRAMEBUFFER, fbo); // 切换绘制场景为帧缓冲区  
+        gl.viewport(0, 0, FBO_WIDTH, FBO_HEIGHT); // 设置帧绘图区域
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT); // clear FBO    
         gl.useProgram(shadowProgram.program);
-        
         // 绘制立方体
         drawCube(shadowProgram,viewProjMatrixFromLight);
-                
         // 绘制平面
         drawPlane(shadowProgram,viewProjMatrixFromLight);
         
-        // 将帧缓冲区切换为正常的缓冲区
+        /*
+         * 切换为正常的缓冲区 
+         */
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
         gl.viewport(0, 0, canvas.width, canvas.height);//设置绘图区域
-         // 清屏和深度缓冲
-        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-        
-        /*
-         * 正常的着色器
-         */ 
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);// clear color and depth
         gl.useProgram(normalProgram.program);
-
         setUniforms(normalProgram,{
             u_shadowMap: 0, // 传递0号纹理:gl.TEXTURE0
             u_lightColor: [1,1,1],// 光照颜色
             u_lightPosition: LIGHT_POS, // 光线方向(世界坐标系下)
+            u_lightDirection: LIGHT_DIR,
             u_ambientColor:[0.2,0.2,0.2], // 环境光颜色
             u_viewPosition:[eyeX,eyeY,eyeZ]
         });
-        
         // 绘制立方体        
         drawCube(normalProgram,viewProjMatrix);
         // 绘制平面
@@ -272,7 +332,7 @@ function main() {
     }());
 
     function drawCube(program,vpMatrix){
-        modelMatrix.setTranslate( 1, 2, 2);
+        modelMatrix.setTranslate( 0, 2, 2);
         modelMatrix.rotate(angle, 0, 1, 0);
         mvpMatrix.set(vpMatrix);
         mvpMatrix.multiply(modelMatrix);
@@ -309,10 +369,9 @@ function main() {
 }
 
 
-function draw(gl, program, buffer,mvpMatrix) {
-    // 输出attribute对应的数据缓冲
+function draw(gl, program, buffer, mvpMatrix) {
     setBuffersAndAttributes(gl,program,buffer);
-    setUniforms(program,{u_mvpMatrix: mvpMatrix.elements});
+    setUniforms(program,{ u_mvpMatrix: mvpMatrix.elements });
     gl.drawElements(gl.TRIANGLES, buffer.count, buffer.indexType, 0);
 }
 
