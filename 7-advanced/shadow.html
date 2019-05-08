@@ -112,7 +112,7 @@ function main() {
         angle %= 360;
 
         gl.bindFramebuffer(gl.FRAMEBUFFER, fbo); // Change the drawing destination to FBO
-        gl.viewport(0, 0, OFFSCREEN_HEIGHT, OFFSCREEN_HEIGHT); // Set view port for FBO
+        gl.viewport(0, 0, OFFSCREEN_WIDTH, OFFSCREEN_HEIGHT); // Set view port for FBO
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT); // Clear FBO    
         /*
          * 阴影着色器
