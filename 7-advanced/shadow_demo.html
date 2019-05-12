@@ -174,10 +174,11 @@ var canvas = document.getElementById('canvas'),
     // 获取对应图形的缓冲区对象
     var planeBuffers = createBufferInfoFromArrays(gl,Plane(10));
     var cubeBuffers = createBufferInfoFromArrays(gl,Cube());
-    var sphereBuffers = createBufferInfoFromArrays(gl,Sphere(1,50,));
-    var cylinderBuffers = createBufferInfoFromArrays(gl,Cylinder(0.8,4,40));
-    var coneBuffers = createBufferInfoFromArrays(gl,Cone(1,4,40));
+    var sphereBuffers = createBufferInfoFromArrays(gl,Sphere(1,40,));
+    var cylinderBuffers = createBufferInfoFromArrays(gl,Cylinder(0.8,4,20));
+    var coneBuffers = createBufferInfoFromArrays(gl,Cone(1,4,20));
 
+    setPixelRatio(canvas);
     gl.clearColor(0, 0, 0, 1);//设置背景颜色
     gl.enable(gl.DEPTH_TEST);//深度测试
     gl.enable(gl.CULL_FACE);//剔除背面
@@ -361,76 +362,6 @@ var canvas = document.getElementById('canvas'),
         setBuffersAndAttributes(gl,program,planeBuffers);
         drawBufferInfo(gl,planeBuffers);
     }
-
-    // var CW = canvas.clientWidth, 
-    //     CH = canvas.clientHeight,
-    //     CENTER = { x: CW / 2, y: CH / 2 },
-    //     START = {},
-    //     SCALE = 1,
-    //     POS = VIEW_POS,
-    //     TIMER;
-
-    // //滚轮放大缩小
-    // wheel(canvas,function(event){
-    //     var len = length(POS);
-    //     if(len <= 2 && event.delta < 0) return;
-    //     if(len >= 80 && event.delta > 0) return;
-    //     SCALE += event.delta * 0.05;
-    //     VIEW_POS = multiply(POS, SCALE);
-
-    //     clearTimeout(TIMER);
-    //     TIMER = setTimeout(function(){
-    //         SCALE =1;
-    //         POS = VIEW_POS;
-    //     },20);
-    //     function length(a){
-    //         return Math.sqrt(Math.pow(a[0],2) + Math.pow(a[1],2) + Math.pow(a[2],2));
-    //     }
-    //     function multiply(a,s) {
-    //         a[0] *= s; 
-    //         a[1] *= s; 
-    //         a[2] *= s;
-    //         return a;
-    //     }
-    // });
-
-    // canvas.addEventListener('mousedown', function(e) {
-    //     START = windowToCanvas(canvas, e.clientX, e.clientY);
-    //     canvas.addEventListener('mousemove', mouseMove, false);
-    //     canvas.addEventListener('mouseup', mouseUp, false);
-    //     canvas.addEventListener('mouseout', mouseUp, false);
-    // }, false);
-
-    // function mouseMove(e) {
-    //     var p = new Vector3(POS);
-    //     var end = windowToCanvas(canvas, e.clientX, e.clientY);
-    //     var yRad = (START.y > CENTER.y ? START.x - end.x : end.x - START.x)/CW * Math.PI * 2;
-    //     var xRad = (START.y - end.y)/CH * Math.PI;
-    //     //旋转角
-    //     p = cameraMatrix.setRotate(yRad,0,1,0,true).multiplyVector3(p);
-    //     var alpha = Math.atan2(POS[1],POS[2]);// yz轴角度
-    //     var theta = Math.atan2(POS[0],POS[2])% (Math.PI/2);// xz轴角度
-    //     console.log(alpha*180/Math.PI,xRad*180/Math.PI);
-    //     if(alpha < Math.PI/2){
-    //         if(alpha - xRad >= Math.PI/2 || alpha - xRad <= -Math.PI/2) return;
-    //     } else {
-    //         xRad = -xRad;
-    //         theta = -theta;
-    //     }
-    //     //俯仰角
-    //     // 绕任意轴旋转 xRad 分解实现: 先旋转 theta 至z轴，绕x轴旋转 xRad，再旋转 theta 回到原位置
-    //     p = cameraMatrix.setRotate(-theta,0,1,0,true).multiplyVector3(p);
-    //     p = cameraMatrix.setRotate(xRad,1,0,0,true).multiplyVector3(p);
-    //     p = cameraMatrix.setRotate(theta,0,1,0,true).multiplyVector3(p);
-    //     VIEW_POS = p.elements
-    // }
-
-    // function mouseUp(e) {
-    //     POS = VIEW_POS;
-    //     canvas.removeEventListener('mouseup', mouseUp, false);
-    //     canvas.removeEventListener('mousemove', mouseMove, false);
-    //     canvas.removeEventListener('mouseout', mouseUp, false);
-    // }
 </script>
 </body>
 </html>
