@@ -16,12 +16,12 @@
   attribute vec4 a_normal;
   uniform mat4 u_modelMatrix;
   uniform mat4 u_normalMatrix;
-  uniform mat4 u_mvpMatrix;
+  uniform mat4 u_vpMatrix;
   varying vec3 v_normal;
   varying vec3 v_position;
 
   void main() {
-    gl_Position = u_mvpMatrix * a_position;
+    gl_Position = u_vpMatrix * u_modelMatrix * a_position;
     v_normal=vec3(u_normalMatrix * a_normal);
     v_position= vec3(u_modelMatrix * a_position);
   }
@@ -90,116 +90,106 @@ var canvas = document.getElementById('canvas'),
     CENTER = { x: canvas.width / 2, y: canvas.height / 2 },
     START = {};
 
-function main() {
-    if (!gl) {
-        console.log('Failed to get the rendering context for WebGL');
-        return;
-    }
+const program = createProgramInfo(gl, 'vs', 'fs');
+const buffers = [
+    createBufferInfoFromArrays(gl, Sphere(1, 50)), 
+    createBufferInfoFromArrays(gl, Cube(1)), 
+    createBufferInfoFromArrays(gl, Cylinder(1, 2, 30)), 
+    createBufferInfoFromArrays(gl, Cone(1, 3, 40))
+];
 
-    var program = createProgramInfo(gl, ['vs', 'fs']),
-        sphereBuffer = createBufferInfoFromArrays(gl, Sphere(1,50)),
-        cubeBuffer = createBufferInfoFromArrays(gl, Cube()),
-        cylinderBuffer = createBufferInfoFromArrays(gl, Cylinder(1, 3, 40)),
-        coneBuffer = createBufferInfoFromArrays(gl, Cone(1, 3, 40)),
-        buffers = [sphereBuffer, cubeBuffer, cylinderBuffer, coneBuffer];
+for (var i = 0; i < NUM; i++) {
+    Polygons.push({
+        xRotation: random(-60, 60),
+        yRotation: random(-60, 60),
+        xAngle: 0,
+        yAngle: 0,
+        x: random(-15, 15),
+        y: random(-15, 15),
+        z: random(3, 25),
+        color: Color.rgbToWebgl(Color.hslToRgb(randomHsl()))
+    });
+}
 
-    for (var i = 0; i < NUM; i++) {
-        Polygons.push({
-            xRotation: random(-60, 60),
-            yRotation: random(-60, 60),
-            xAngle: 0,
-            yAngle: 0,
-            x: random(-15, 15),
-            y: random(-15, 15),
-            z: random(3, 25),
-            color: Color.rgbToWebgl(Color.hslToRgb(randomHsl()))
+gl.clearColor(0.1, 0.1, 0.1, 1);
+gl.enable(gl.DEPTH_TEST);
+gl.enable(gl.CULL_FACE);
+gl.viewport(0, 0, canvas.width, canvas.height); //设置绘图区域
+gl.useProgram(program.program);
+
+setUniforms(program, {
+    u_lightColor: [1, 1, 1],
+    u_lightPosition: LIGHT_POS,
+    u_lightPosition2: LIGHT_POS2,
+    u_ambientColor: [0.4, 0.4, 0.4]
+});
+
+var modelMatrix = new Matrix4(),
+    normalMatrix = new Matrix4(),
+    vpMatrix = new Matrix4(),
+    buffer,
+    last = Date.now();
+
+(function animate() {
+    var now = new Date(),
+        elapsed = now - last;
+
+    last = now;
+    var angleX = (viewAngleX + cViewAngleX) % 360,
+        angleY = viewAngleY + cViewAngleY,
+        len = viewLEN + LENS;
+
+    // if(angleY<-270){
+    //     angleY+=360
+    // }
+    // if(angleY>270){
+    //     angleY-=360
+    // }
+
+    // angleY = angleY > 90 ? 90 : angleY < 10 ? 10 : angleY;
+    len = len > 100 ? 100 : len < 6 ? 6 : len;
+
+    var eyeY = len * Math.sin(angleY * Math.PI / 180),
+        c = len * Math.cos(angleY * Math.PI / 180),
+        eyeX = c * Math.sin(angleX * Math.PI / 180),
+        eyeZ = c * Math.cos(angleX * Math.PI / 180);
+
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+    Polygons.forEach((polygon, i) => {
+        polygon.xAngle += polygon.xRotation * elapsed / 1000;
+        polygon.yAngle += polygon.yRotation * elapsed / 1000;
+        polygon.xAngle %= 360;
+        polygon.yAngle %= 360;
+
+        // 模型矩阵
+        modelMatrix.setRotate(polygon.xAngle, 1, 0, 0);
+        modelMatrix.rotate(polygon.yAngle, 0, 1, 0);
+        modelMatrix.translate(0, 0, polygon.z);
+
+        // 视图投影矩阵
+        vpMatrix.setPerspective(45, canvas.width / canvas.height, 1.0, 200.0);
+        vpMatrix.lookAt(eyeX, eyeY, eyeZ, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0);
+
+        // 逆转置模型矩阵
+        normalMatrix.setInverseOf(modelMatrix);
+        normalMatrix.transpose();
+        
+        buffer = buffers[i % buffers.length];
+        setBuffersAndAttributes(gl, program, buffer);
+        setUniforms(program, {
+            u_viewPosition: [eyeX, eyeY, eyeZ],
+            u_color: polygon.color,
+            u_modelMatrix: modelMatrix.elements,
+            u_normalMatrix: normalMatrix.elements,
+            u_vpMatrix: vpMatrix.elements
         });
-    }
 
-    gl.clearColor(0.1, 0.1, 0.1, 1);
-    gl.enable(gl.DEPTH_TEST);
-    gl.enable(gl.CULL_FACE);
-    gl.viewport(0, 0, canvas.width, canvas.height); //设置绘图区域
-
-    gl.useProgram(program.program);
-
-    setUniforms(program, {
-        u_lightColor: [1, 1, 1],
-        u_lightPosition: LIGHT_POS,
-        u_lightPosition2: LIGHT_POS2,
-        u_ambientColor: [0.4, 0.4, 0.4]
+        drawBufferInfo(gl,buffer);
     });
 
-    var modelMatrix = new Matrix4(),
-        normalMatrix = new Matrix4(),
-        mvpMatrix = new Matrix4(),
-        last = Date.now();
-
-    (function animate() {
-        var now = new Date(),
-            elapsed = now - last;
-
-        last = now;
-        var angleX = (viewAngleX + cViewAngleX) % 360;
-            angleY = viewAngleY + cViewAngleY,
-            // len = viewLEN * LENPERCENT;
-            len = viewLEN + LENS;
-
-        // if(angleY<-270){
-        //     angleY+=360
-        // }
-        // if(angleY>270){
-        //     angleY-=360
-        // }
-
-        // angleY = angleY > 90 ? 90 : angleY < 10 ? 10 : angleY;
-        len = len > 100 ? 100 : len < 6 ? 6 : len;
-
-        var eyeY = len * Math.sin(angleY * Math.PI / 180),
-            c = len * Math.cos(angleY * Math.PI / 180),
-            eyeX = c * Math.sin(angleX * Math.PI / 180),
-            eyeZ = c * Math.cos(angleX * Math.PI / 180);
-
-        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-
-        var buffer;
-        Polygons.forEach((polygon, i) => {
-            polygon.xAngle += polygon.xRotation * elapsed / 1000;
-            polygon.yAngle += polygon.yRotation * elapsed / 1000;
-            polygon.xAngle %= 360;
-            polygon.yAngle %= 360;
-
-            // 模型矩阵
-            modelMatrix.setRotate(polygon.xAngle, 1, 0, 0);
-            modelMatrix.rotate(polygon.yAngle, 0, 1, 0);
-            modelMatrix.translate(0, 0, polygon.z);
-            // modelMatrix.translate(polygon.x,polygon.y,polygon.z);
-
-            // 每次重置mvp矩阵
-            mvpMatrix.setPerspective(45, canvas.width / canvas.height, 1.0, 200.0);
-            mvpMatrix.lookAt(eyeX, eyeY, eyeZ, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0);
-            mvpMatrix.multiply(modelMatrix);
-
-            // 逆转置矩阵
-            normalMatrix.setInverseOf(modelMatrix);
-            normalMatrix.transpose();
-            
-            buffer = buffers[i % buffers.length];
-            setBuffersAndAttributes(gl, program, buffer);
-            setUniforms(program, {
-                u_viewPosition: [eyeX, eyeY, eyeZ],
-                u_color: polygon.color,
-                u_modelMatrix: modelMatrix.elements,
-                u_normalMatrix: normalMatrix.elements,
-                u_mvpMatrix: mvpMatrix.elements
-            });
-
-            drawBufferInfo(gl,buffer);
-        });
-
-        requestAnimationFrame(animate);
-    }());
-}
+    requestAnimationFrame(animate);
+}());
 
 
 canvas.addEventListener('mousedown', function(e) {
@@ -245,8 +235,6 @@ document.addEventListener('mousewheel', function(e){
     LENS +=val/3;
 
 }, false);
-
-main();
 </script>
 </body>
 </html>

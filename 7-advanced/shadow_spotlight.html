@@ -48,14 +48,10 @@
     }
 </script>
 <script type="x-shader/x-fragment" id="sfs">
-    #ifdef GL_ES
-        precision highp float;
-    #endif
+    precision highp float;
+    const vec4 bitShift = vec4(1.0, 256.0, 256.0 * 256.0, 256.0 * 256.0 * 256.0);// 使用rgba 4字节共32位来存储z值,1个字节精度为1/256
+    const vec4 bitMask = vec4(1.0/256.0, 1.0/256.0, 1.0/256.0, 0.0);// gl_FragCoord:片元的坐标,fract():返回数值的小数部分
     vec4 pack (float depth) {
-        // 使用rgba 4字节共32位来存储z值,1个字节精度为1/256
-        const vec4 bitShift = vec4(1.0, 256.0, 256.0 * 256.0, 256.0 * 256.0 * 256.0);
-        const vec4 bitMask = vec4(1.0/256.0, 1.0/256.0, 1.0/256.0, 0.0);
-        // gl_FragCoord:片元的坐标,fract():返回数值的小数部分
         vec4 rgbaDepth = fract(depth * bitShift); //计算每个点的z值 
         rgbaDepth -= rgbaDepth.gbaa * bitMask; // Cut off the value which do not fit in 8 bits
         return rgbaDepth;
@@ -84,9 +80,7 @@
     }
 </script>
 <script type="x-shader/x-fragment" id="fs">
-    #ifdef GL_ES
-        precision highp float;
-    #endif
+    precision highp float;
     uniform vec3 u_lightColor;
     uniform vec3 u_lightPosition;
     uniform vec3 u_lightDirection;//光源方向(聚光灯朝向)
@@ -96,7 +90,6 @@
     uniform sampler2D u_shadowMap;
     const float shininess = 50.0;
     const vec3 specularColor = vec3(1.0,1.0,1.0);
-
     varying vec4 v_positionFromLight;
     varying vec4 v_position;
     varying vec3 v_normal;
@@ -104,26 +97,24 @@
     /**
      * 释出深度值z
      */
-    float unpack(const in vec4 rgbaDepth) {
-        const vec4 bitShift = vec4(1.0, 1.0/256.0, 1.0/(256.0*256.0), 1.0/(256.0*256.0*256.0));
-        return dot(rgbaDepth, bitShift);
+    const vec4 bitShift = vec4(1.0, 1.0/256.0, 1.0/(256.0 * 256.0), 1.0/(256.0 * 256.0 * 256.0));
+    float unpackDepth(const in vec4 rgbaDepth) {
+        return dot(rgbaDepth,bitShift);
+    }
+    float texture2DCompare(sampler2D depths, vec2 uv, float compare){
+        float depth = unpackDepth(texture2D(depths,uv));
+        return step(compare, depth);
     }
     // pcf消除阴影边缘的锯齿
-    float pcf(float theta,vec4 position) {
+    float pcf(sampler2D shadowMap,vec4 position,float bias) {
         float shadows = 0.0;
         float opacity = 0.4;// 基底阴影alpha值
         float texelSize = 1.0/2048.0;// 阴影像素尺寸,值越小阴影越逼真
-        vec4 rgbaDepth;
         // 将xyz坐标从齐次坐标区间[-1,1]归一化为纹理使用的[0,1]，xy分量用于查找纹理颜色值rgba，z分量就是在光源坐标系下的深度值; 
-        vec3 shadowCoord = (position.xyz/position.w)/2.0 + 0.5;
-        // 根据光线与表面的夹角计算偏移量,用于消除马赫带
-        float bias = 0.005 * tan(acos(theta));
-        bias = clamp(bias, 0.0015, 0.01);
-
+        vec3 shadowCoord = (position.xyz/position.w)/2.0 + 0.5;        
         for(float y=-1.5; y <= 1.5; y += 1.0){
             for(float x=-1.5; x <=1.5; x += 1.0){
-                rgbaDepth = texture2D(u_shadowMap, shadowCoord.xy + vec2(x,y) * texelSize);
-                shadows += step(shadowCoord.z - bias, unpack(rgbaDepth));
+                shadows += texture2DCompare(shadowMap, shadowCoord.xy + vec2(x,y) * texelSize, shadowCoord.z - bias);
             }
         }
         shadows /= 16.0;
@@ -161,7 +152,8 @@
 
         //阴影(聚光灯范围外无阴影)
         //float shadow = dotFromDirection > limit ? pcf(cosTheta,v_positionFromLight) : 1.0;
-        float shadow = min(inLight, pcf(cosTheta,v_positionFromLight));
+        float bias = max(0.05 * (1.0 - cosTheta),0.005);
+        float shadow = dotFromDirection > limit ? pcf(u_shadowMap,v_positionFromLight,bias) : 1.0 ;
 
         gl_FragColor = vec4(ambient + (diffuse + specular) * shadow , 1.0);        
     }
@@ -266,7 +258,7 @@ var angle = 29,ANGLE_STEP = 40, last = Date.now();
         eyeX=c*Math.sin(angleX*Math.PI/180),
         eyeZ=c*Math.cos(angleX*Math.PI/180);
 
-    vpMatrixFromLight.setPerspective(90, FBO_WIDTH / FBO_HEIGHT, 1, 100);
+    vpMatrixFromLight.setPerspective(45, FBO_WIDTH / FBO_HEIGHT, 1, 100);
     vpMatrixFromLight.lookAt(...LIGHT_POS, 0, 0, 0, 0, 1, 0);
 
     vpMatrix.setPerspective(35, canvas.width / canvas.height, 1, 100);

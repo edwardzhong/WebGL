@@ -23,24 +23,18 @@
     }
 </script>
 <script type="x-shader/x-fragment" id="sfs">
-    #ifdef GL_ES
-        precision highp float;
-    #endif
-    /**
-     * 分解保存深度值
-     */
-    vec4 pack (float depth) {
-        // 当光源与照射物间距离变远,z值会增大,而1个分量的8位已经不够存储深度值,所以使用4个分量(rgba) 4字节共32位来存储z值,1个字节8位精度为1/256
+    precision highp float;
+    const vec4 bitShift = vec4(1.0, 256.0, 256.0 * 256.0, 256.0 * 256.0 * 256.0);// 使用rgba 4字节共32位来存储z值,1个字节精度为1/256
+    const vec4 bitMask = vec4(1.0/256.0, 1.0/256.0, 1.0/256.0, 0.0);
+    vec4 packDepth (float depth) {
         // gl_FragCoord:片元的坐标,fract():返回数值的小数部分
-        const vec4 bitShift = vec4(1.0, 256.0, 256.0 * 256.0, 256.0 * 256.0 * 256.0);
-        const vec4 bitMask = vec4(1.0/256.0, 1.0/256.0, 1.0/256.0, 0.0);
-        vec4 rgbaDepth = fract(depth * bitShift); // 计算每个点的z值 
-        rgbaDepth -= rgbaDepth.gbaa * bitMask; // 清除多余的部分
+        //将深度值z分段存储到rgba分量, 接着rgba会绘制到帧缓冲颜色关联对象中的纹理对象，在这里帧缓冲对象只是用于保存数据，它是离屏渲染，不会绘制到屏幕
+        vec4 rgbaDepth = fract(depth * bitShift); //计算每个点的z值 
+        rgbaDepth -= rgbaDepth.gbaa * bitMask; // Cut off the value which do not fit in 8 bits
         return rgbaDepth;
     }
-    //将深度值z分段存储到rgba分量, 接着rgba会绘制到帧缓冲颜色关联对象中的纹理对象，在这里帧缓冲对象只是用于保存数据，它是离屏渲染，不会绘制到屏幕
     void main() {
-        gl_FragColor = pack(gl_FragCoord.z);
+        gl_FragColor = packDepth(gl_FragCoord.z);
     }
 </script>
 <script type="x-shader/x-vertex" id="vs">
@@ -62,9 +56,7 @@
     }
 </script>
 <script type="x-shader/x-fragment" id="fs">
-    #ifdef GL_ES
-        precision mediump float;
-    #endif
+    precision mediump float;
     uniform vec3 u_lightColor;
     uniform vec3 u_lightPosition;
     uniform vec3 u_ambientColor;
@@ -74,39 +66,81 @@
     varying vec4 v_positionFromLight;
     varying vec3 v_position;
     varying vec3 v_normal;
-
-    /**
-     * 释出深度值z
-     */
-    float unpack(const in vec4 rgbaDepth) {
-        const vec4 bitShift = vec4(1.0, 1.0/256.0, 1.0/(256.0*256.0), 1.0/(256.0*256.0*256.0));
-        return dot(rgbaDepth, bitShift);
+    // #define SHADOWMAP_PCF_SOFT
+    const vec4 bitShift = vec4(1.0, 1.0/256.0, 1.0/(256.0 * 256.0), 1.0/(256.0 * 256.0 * 256.0));
+    float unpackDepth(const in vec4 rgbaDepth) {
+        return dot(rgbaDepth,bitShift);
     }
-    // pcf消除阴影边缘的锯齿
-    float pcf(float cosTheta,vec4 position) {
-        float shadows = 0.0;
-        float opacity = 0.4;// 基底阴影alpha值
-        float texelSize = 1.0/2048.0;// 阴影像素尺寸,值越小阴影越逼真
-        vec4 rgbaDepth;
-        // 将xyz坐标从齐次坐标区间[-1,1]归一化为纹理使用的[0,1]，xy分量用于查找纹理颜色值rgba，z分量就是在光源坐标系下的深度值; 
-        vec3 shadowCoord = (position.xyz/position.w)/2.0 + 0.5;
-        // 根据光线与表面的夹角计算偏移量,用于消除马赫带
-        float bias = 0.005 * tan(acos(cosTheta));
-        bias = clamp(bias, 0.0015, 0.01);
+    float texture2DCompare(sampler2D depths, vec2 uv, float compare){
+        float depth = unpackDepth(texture2D(depths,uv));
+        return step(compare, depth);
+    }
+    float texture2DShadowLerp(sampler2D depths, vec2 size, vec2 uv, float compare) {
+        const vec2 offset = vec2( 0.0, 1.0 );
+        vec2 texelSize = vec2( 1.0 ) / size;
+        vec2 centroidUV = floor( uv * size + 0.5 ) / size;
+        float lb = texture2DCompare( depths, centroidUV + texelSize * offset.xx, compare );
+        float lt = texture2DCompare( depths, centroidUV + texelSize * offset.xy, compare );
+        float rb = texture2DCompare( depths, centroidUV + texelSize * offset.yx, compare );
+        float rt = texture2DCompare( depths, centroidUV + texelSize * offset.yy, compare );
+        vec2 f = fract( uv * size + 0.5 );
+        float a = mix( lb, lt, f.y );
+        float b = mix( rb, rt, f.y );
+        float c = mix( a, b, f.x );
+        return c;
+    }
 
-        for(float y=-1.5; y <= 1.5; y += 1.0){
-            for(float x=-1.5; x <=1.5; x += 1.0){
-                rgbaDepth = texture2D(u_shadowMap, shadowCoord.xy + vec2(x,y) * texelSize);
-                shadows += step(shadowCoord.z - bias, unpack(rgbaDepth));
-            }
+    float getShadow(sampler2D shadowMap, vec2 shadowMapSize, float bias, vec4 shadowCoord) {
+        float shadow = 1.0;
+        shadowCoord.xyz = shadowCoord.xyz/shadowCoord.w * 0.5 + 0.5;//将xyz从坐标区间[-1,1]转换为纹理区间[0,1]，其中xy分量用于查找纹理颜色值rgba，z分量是在光源坐标系下的深度值; 
+        shadowCoord.z -= bias;
+        //检测是否在贴图范围内，在贴图覆盖范围内才进行阴影比较
+        bvec4 inFrustumVec = bvec4(shadowCoord.x >= 0.0, shadowCoord.x <= 1.0, shadowCoord.y >= 0.0, shadowCoord.y <= 1.0);
+        bool inFrustum = all(inFrustumVec);
+        bvec2 frustumTestVec = bvec2(inFrustum, shadowCoord.z <= 1.0);
+        bool frustumTest = all(frustumTestVec);
+        if (frustumTest) {
+        #if defined( SHADOWMAP_PCF )
+            vec2 texelSize = vec2(1.0) / shadowMapSize;
+            float dx0 = - texelSize.x;
+            float dy0 = - texelSize.y;
+            float dx1 = + texelSize.x;
+            float dy1 = + texelSize.y;
+            shadow = (
+                texture2DCompare(shadowMap, shadowCoord.xy + vec2( dx0, dy0 ), shadowCoord.z) +
+                texture2DCompare(shadowMap, shadowCoord.xy + vec2( 0.0, dy0 ), shadowCoord.z) +
+                texture2DCompare(shadowMap, shadowCoord.xy + vec2( dx1, dy0 ), shadowCoord.z) +
+                texture2DCompare(shadowMap, shadowCoord.xy + vec2( dx0, 0.0 ), shadowCoord.z) +
+                texture2DCompare(shadowMap, shadowCoord.xy, shadowCoord.z ) +
+                texture2DCompare(shadowMap, shadowCoord.xy + vec2( dx1, 0.0 ), shadowCoord.z) +
+                texture2DCompare(shadowMap, shadowCoord.xy + vec2( dx0, dy1 ), shadowCoord.z) +
+                texture2DCompare(shadowMap, shadowCoord.xy + vec2( 0.0, dy1 ), shadowCoord.z) +
+                texture2DCompare(shadowMap, shadowCoord.xy + vec2( dx1, dy1 ), shadowCoord.z)
+            ) * ( 1.0 / 9.0 );
+        #elif defined( SHADOWMAP_PCF_SOFT )
+            vec2 texelSize = vec2( 1.0 ) / shadowMapSize;
+            float dx0 = - texelSize.x;
+            float dy0 = - texelSize.y;
+            float dx1 = + texelSize.x;
+            float dy1 = + texelSize.y;
+            shadow = (
+                texture2DShadowLerp( shadowMap, shadowMapSize, shadowCoord.xy + vec2( dx0, dy0 ), shadowCoord.z ) +
+                texture2DShadowLerp( shadowMap, shadowMapSize, shadowCoord.xy + vec2( 0.0, dy0 ), shadowCoord.z ) +
+                texture2DShadowLerp( shadowMap, shadowMapSize, shadowCoord.xy + vec2( dx1, dy0 ), shadowCoord.z ) +
+                texture2DShadowLerp( shadowMap, shadowMapSize, shadowCoord.xy + vec2( dx0, 0.0 ), shadowCoord.z ) +
+                texture2DShadowLerp( shadowMap, shadowMapSize, shadowCoord.xy, shadowCoord.z ) +
+                texture2DShadowLerp( shadowMap, shadowMapSize, shadowCoord.xy + vec2( dx1, 0.0 ), shadowCoord.z ) +
+                texture2DShadowLerp( shadowMap, shadowMapSize, shadowCoord.xy + vec2( dx0, dy1 ), shadowCoord.z ) +
+                texture2DShadowLerp( shadowMap, shadowMapSize, shadowCoord.xy + vec2( 0.0, dy1 ), shadowCoord.z ) +
+                texture2DShadowLerp( shadowMap, shadowMapSize, shadowCoord.xy + vec2( dx1, dy1 ), shadowCoord.z )
+            ) * ( 1.0 / 9.0 );
+        #else
+            shadow = texture2DCompare( shadowMap, shadowCoord.xy, shadowCoord.z );
+        #endif
         }
-        shadows /= 16.0;
-        return min(opacity + shadows, 1.0);
-        //不使用pcf的方案
-        //vec4 rgbaDepth = texture2D(u_shadowMap, shadowCoord.xy);// 获取指定纹理坐标处的像素颜色rgba
-        //float depth = unpack(rgbaDepth); // 从纹理颜色值(rgba)解析出阴影深度值z
-        //float visibility = (shadowCoord.z > depth + bias) ? 0.5 : 1.0;//大于阴影贴图中的z值,说明在阴影中
+        return shadow;
     }
+
     void main() {
         // 对法线归一化，因为内插之后长度不一定是1
         vec3 normal = normalize(v_normal);
@@ -115,12 +149,12 @@
         * 计算光线方向
         */
         // 点光源反向 光源位置-顶点位置
-        vec3 lightDirection = normalize(u_lightPosition - v_position);
+        vec3 lightDir = normalize(u_lightPosition - v_position);
         // 平行光源反向
-        // vec3 lightDirection = normalize(u_lightPosition);
+        // vec3 lightDir = normalize(u_lightPosition);
 
         // 光线方向和法向量的夹角，它们的点积即可求出夹角余弦值(范围0-90度)
-        float cosTheta = max(dot(lightDirection, normal), 0.0);
+        float cosTheta = max(dot(lightDir, normal), 0.0);
 
         // 漫反射亮度
         vec3 diffuse = u_lightColor * u_color.rgb * cosTheta;
@@ -131,25 +165,27 @@
         /**
          * 高光部分
          */
-        float shininess =50.0;
+        float shininess = 50.0;
         vec3 specularColor = vec3(1.0,1.0,1.0);//镜面反射光颜色
         vec3 viewDirection = normalize(u_viewPosition-v_position);// 反射方向
 
         // phong 模型 高光部分更加集中
-        // vec3 reflectionDirection = normalize(reflect(-lightDirection, normal));
+        // vec3 reflectionDirection = normalize(reflect(-lightDir, normal));
         // float specularIntensity = pow(max(dot(reflectionDirection, viewDirection), 0.0), shininess);
 
         // Blinn-Phong 模型 高光过渡更自然
-        vec3 halfwayDir = normalize(lightDirection + viewDirection);
+        vec3 halfwayDir = normalize(lightDir + viewDirection);
         float specularIntensity = pow(max(dot(normal, halfwayDir), 0.0), shininess);
 
         // 镜面高光亮度
         vec3 specular = specularColor.rgb * specularIntensity;
+
+        vec2 shadowMapSize = vec2(2048.0);
+        float bias = max(0.05 * (1.0 - dot(normal, lightDir)), 0.005);
+        float shadow = getShadow(u_shadowMap, shadowMapSize, bias, v_positionFromLight);
+        shadow = min(0.3 + shadow, 1.0);// 调节阴影 alpha为 0.3 以上
+        specular *= step(1.0,shadow);// 阴影处没有高光
         
-        // pcf 通过光源坐标系下的位置找出阴影纹理的颜色值，再由颜色值rgba分解出深度值z
-        float shadow = pcf(cosTheta,v_positionFromLight);
-        
-        specular *= step(shadow, 1.0);// 阴影处没有高光
         gl_FragColor = vec4(ambient + (diffuse + specular) * shadow, 1.0);
     }
 </script>
@@ -160,7 +196,7 @@
 var canvas = document.getElementById('canvas'),
     OFFSCREEN_WIDTH = 2048,
     OFFSCREEN_HEIGHT = 2048,
-    LIGHT_POS = [2,8,9],//光源位置
+    LIGHT_POS = [2,6,6],//光源位置
     VIEW_POS = [-2,9,18],
     cameraPos = orbitControl(canvas, [-2, 9, 18], 1, 100);
 
@@ -189,7 +225,7 @@ var canvas = document.getElementById('canvas'),
     var normalMatrix = new Matrix4();// 向量矩阵
     var cameraMatrix = new Matrix4();//相机矩阵
 
-    vpMatrixFromLight.setPerspective(90, OFFSCREEN_WIDTH / OFFSCREEN_HEIGHT, 1.0, 100.0);
+    vpMatrixFromLight.setPerspective(90, OFFSCREEN_WIDTH / OFFSCREEN_HEIGHT, 1, 100);
     vpMatrixFromLight.lookAt(...LIGHT_POS, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0);
 
     var angle=29,ANGLE_STEP = 40, last = Date.now();
@@ -201,7 +237,7 @@ var canvas = document.getElementById('canvas'),
         angle += ANGLE_STEP * elapsed / 1000;
         angle %= 360;
         VIEW_POS = cameraPos();
-        vpMatrix.setPerspective(30, canvas.width / canvas.height, 1.0, 100.0);
+        vpMatrix.setPerspective(30, canvas.width / canvas.height, 1, 100);
         vpMatrix.lookAt(...VIEW_POS, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0);
 
         /*
@@ -247,7 +283,7 @@ var canvas = document.getElementById('canvas'),
     }());
 
     function drawCone(program){
-        modelMatrix.setTranslate( -3, 2, -3);
+        modelMatrix.setTranslate( -3, 2.3, -3);
         modelMatrix.rotate(angle, 1, 0, 0);
         normalMatrix.setInverseOf(modelMatrix);
         normalMatrix.transpose();
